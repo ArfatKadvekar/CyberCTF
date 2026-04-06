@@ -1,13 +1,24 @@
 import axios from 'axios';
 
 // Determine API base URL
-// In development: use relative path /api (Vite proxies to localhost:5000)
-// In production: use VITE_API_URL environment variable
+// Production: Use VITE_API_URL env var, fallback to Render backend
+// Development: Use /api proxy (Vite proxies to localhost:5000)
 const getBaseURL = () => {
+  // Check if environment variable is set (from Vercel)
   if (import.meta.env.VITE_API_URL) {
+    console.log('✓ Using backend URL from VITE_API_URL:', import.meta.env.VITE_API_URL);
     return import.meta.env.VITE_API_URL;
   }
-  // Development fallback - Vite proxy handles this
+  
+  // Production fallback: use Render backend
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    const backendURL = 'https://cyberctf.onrender.com/api';
+    console.log('✓ Using production Render backend:', backendURL);
+    return backendURL;
+  }
+  
+  // Development: use Vite proxy
+  console.log('ℹ Development mode: using /api proxy (routes to localhost:5000)');
   return '/api';
 };
 
