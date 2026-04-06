@@ -21,6 +21,14 @@ const corsOptions = {
   maxAge: 86400 // 24 hours
 };
 
+// Log CORS configuration for debugging
+console.log('[CORS] Configuration:', {
+  allowedOrigin: corsOptions.origin,
+  credentials: corsOptions.credentials,
+  fromEnv: !!process.env.CORS_ORIGIN,
+  nodeEnv: NODE_ENV
+});
+
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));

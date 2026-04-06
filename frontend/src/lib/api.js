@@ -1,24 +1,27 @@
 import axios from 'axios';
 
-// Determine API base URL
-// Production: Use VITE_API_URL env var, fallback to Render backend
-// Development: Use /api proxy (Vite proxies to localhost:5000)
+// Determine API base URL with smart fallback strategy
+// Priority 1: VITE_API_URL environment variable (set in Vercel dashboard)
+// Priority 2: Production fallback to Render backend
+// Priority 3: Development proxy to localhost:5000
 const getBaseURL = () => {
-  // Check if environment variable is set (from Vercel)
-  if (import.meta.env.VITE_API_URL) {
-    console.log('✓ Using backend URL from VITE_API_URL:', import.meta.env.VITE_API_URL);
-    return import.meta.env.VITE_API_URL;
+  // Check if environment variable is set (from Vercel dashboard)
+  if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim()) {
+    const url = import.meta.env.VITE_API_URL.trim();
+    console.log('[API] ✓ Using VITE_API_URL environment variable:', url);
+    return url;
   }
   
   // Production fallback: use Render backend
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
     const backendURL = 'https://cyberctf.onrender.com/api';
-    console.log('✓ Using production Render backend:', backendURL);
+    console.log('[API] ⚠ Using hardcoded production backend (VITE_API_URL not set):', backendURL);
+    console.log('[API] → Tip: Set VITE_API_URL in Vercel dashboard for better flexibility');
     return backendURL;
   }
   
-  // Development: use Vite proxy
-  console.log('ℹ Development mode: using /api proxy (routes to localhost:5000)');
+  // Development: use Vite proxy (vite.config.js proxies /api to localhost:5000)
+  console.log('[API] ℹ Development mode: using /api proxy');
   return '/api';
 };
 
@@ -35,6 +38,15 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Log request for debugging
+  console.log('[API] Request:', {
+    method: config.method?.toUpperCase(),
+    url: config.url,
+    fullURL: config.baseURL + config.url,
+    hasToken: !!token
+  });
+  
   return config;
 });
 
@@ -42,11 +54,32 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Log 404 errors for debugging
+    if (error.response?.status === 404) {
+      console.error('[API] 404 Error - Route not found:', {
+        endpoint: error.config?.url,
+        fullURL: error.config?.baseURL + error.config?.url,
+        status: error.response?.status,
+        message: error.response?.data?.message
+      });
+    }
+    
+    // Log CORS errors
+    if (error.message === 'Network Error' && !error.response) {
+      console.error('[API] Network Error - Possible CORS issue:', {
+        endpoint: error.config?.url,
+        baseURL: error.config?.baseURL,
+        hint: 'Check browser Network tab for CORS errors'
+      });
+    }
+    
+    // Handle 401 - Unauthorized
     if (error.response?.status === 401) {
       localStorage.removeItem('ctf_token');
       localStorage.removeItem('ctf_user');
       window.location.href = '/';
     }
+    
     return Promise.reject(error);
   }
 );
