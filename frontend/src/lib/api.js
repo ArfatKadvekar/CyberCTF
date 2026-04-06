@@ -5,24 +5,23 @@ import axios from 'axios';
 // Priority 2: Production fallback to Render backend
 // Priority 3: Development proxy to localhost:5000
 const getBaseURL = () => {
-  // Check if environment variable is set (from Vercel dashboard)
-  if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim()) {
-    const url = import.meta.env.VITE_API_URL.trim();
+  const url = import.meta.env.VITE_API_URL;
+  
+  if (url && url.trim() !== '') {
     console.log('[API] ✓ Using VITE_API_URL environment variable:', url);
-    return url;
+    return url.trim();
+  }
+
+  // Fallback if VITE_API_URL is missing
+  if (import.meta.env.DEV) {
+    console.log('[API] ℹ Development mode: using /api proxy');
+    return '/api'; // Use Vite proxy for local dev
   }
   
-  // Production fallback: use Render backend
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    const backendURL = 'https://cyberctf.onrender.com/api';
-    console.log('[API] ⚠ Using hardcoded production backend (VITE_API_URL not set):', backendURL);
-    console.log('[API] → Tip: Set VITE_API_URL in Vercel dashboard for better flexibility');
-    return backendURL;
-  }
-  
-  // Development: use Vite proxy (vite.config.js proxies /api to localhost:5000)
-  console.log('[API] ℹ Development mode: using /api proxy');
-  return '/api';
+  const backendURL = 'https://cyberctf.onrender.com/api';
+  console.log('[API] ⚠ Using hardcoded production backend (VITE_API_URL not set):', backendURL);
+  console.log('[API] → Tip: Set VITE_API_URL in Vercel dashboard for better flexibility');
+  return backendURL;
 };
 
 const api = axios.create({
