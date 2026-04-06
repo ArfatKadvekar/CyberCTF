@@ -1,0 +1,67 @@
+# =========================
+# ENV FILES (CRITICAL)
+# =========================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.*.production
+backend/.env
+frontend/.env
+*.env
+!.env.example
+
+# =========================
+# DEPENDENCIES & BUILDS
+# =========================
+node_modules/
+dist/
+build/
+coverage/
+
+# =========================
+# LOGS
+# =========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# TEST & DEV FILES
+# =========================
+**/test-*.js
+**/seed.js
+coverage/
+.nyc_output/
+
+# =========================
+# DATABASE FILES
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# IDE & OS
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =========================
+# TEMP FILES
+# =========================
+.tmp
+.cache
+temp/
+
+# =========================
+# VERCEL
+# =========================
+.vercel/

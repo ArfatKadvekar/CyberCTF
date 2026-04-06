@@ -1,0 +1,12 @@
+{
+  "name": "ctf-platform-frontend",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "devCommand": "npm run dev",
+  "env": {
+    "VITE_API_URL": "@api_url",
+    "VITE_CLOUDINARY_CLOUD_NAME": "@cloudinary_cloud_name",
+    "VITE_CLOUDINARY_UPLOAD_PRESET": "@cloudinary_upload_preset"
+  }
+}
