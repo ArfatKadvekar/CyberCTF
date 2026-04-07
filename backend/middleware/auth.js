@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
 // Verify JWT and attach user to request
+// This middleware verifies JWT without checking sessionToken,
+// allowing multiple simultaneous sessions per user
 export const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -24,10 +26,8 @@ export const authMiddleware = async (req, res, next) => {
       return res.status(403).json({ message: 'Your account has been banned from this event.' });
     }
 
-    // Verify this is the active session
-    if (!user.sessionToken || user.sessionToken !== decoded.sessionToken) {
-      return res.status(401).json({ message: 'Session invalid or expired. Please join again.' });
-    }
+    // ✓ FIXED: Removed sessionToken validation to allow multiple simultaneous sessions
+    // JWT expiration (7 days) handles session validity automatically
 
     req.user = user;
     next();
@@ -55,13 +55,14 @@ export const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Generate JWT token
+// Generate JWT token (7 day expiry)
+// ✓ FIXED: Removed sessionToken from JWT payload
+// Multiple sessions are now allowed per user
 export const generateToken = (user) => {
   return jwt.sign(
     { 
       userId: user._id, 
-      role: user.role,
-      sessionToken: user.sessionToken 
+      role: user.role
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }

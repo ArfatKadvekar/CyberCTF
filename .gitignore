@@ -27,6 +27,7 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # =========================
 # TEST & DEV FILES
@@ -48,6 +49,24 @@ coverage/
 # =========================
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =========================
+# VERCEL
+# =========================
+.vercel/
+
+# =========================
+# MISC
+# =========================
+.next/
+out/
+*.tsbuildinfo
+
 .vscode/
 .idea/
 *.swp

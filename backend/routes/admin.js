@@ -1,6 +1,6 @@
 import express from 'express';
 import PDFDocument from 'pdfkit';
-import { User, Event, Challenge, Submission, UnlockedHint } from '../models/index.js';
+import { User, Event, Challenge, Submission, UnlockedHint, Category } from '../models/index.js';
 import { authMiddleware, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -479,6 +479,154 @@ router.get('/analytics/:eventId', async (req, res, next) => {
 
 // ============ EXPORTS ============
 
+// GET /api/admin/leaderboard/:eventId/progression - Get score progression for top players over time
+router.get('/leaderboard/:eventId/progression', async (req, res, next) => {
+  try {
+    const { eventId, limit = 10 } = req.query;
+    const topN = Math.min(parseInt(limit) || 10, 20); // Cap at 20
+
+    // Verify event exists
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Get top N players
+    const topPlayers = await User.find({ eventId, role: 'player' })
+      .select('_id username score')
+      .sort({ score: -1 })
+      .limit(topN);
+
+    if (topPlayers.length === 0) {
+      return res.json({ progression: [] });
+    }
+
+    // For each player, get their score progression based on submissions
+    const progressionData = await Promise.all(
+      topPlayers.map(async (player) => {
+        // Get all correct submissions for this player, sorted by time
+        const submissions = await Submission.find({
+          userId: player._id,
+          isCorrect: true,
+          eventId
+        })
+          .populate('challengeId', 'points')
+          .sort({ createdAt: 1 });
+
+        // Calculate cumulative score over time
+        let cumulativeScore = 0;
+        const timelinePoints = submissions.map((sub) => {
+          cumulativeScore += sub.challengeId?.points || 0;
+          return {
+            time: sub.createdAt,
+            score: cumulativeScore
+          };
+        });
+
+        // Add final data point
+        if (timelinePoints.length === 0) {
+          timelinePoints.push({
+            time: player.createdAt || new Date(),
+            score: 0
+          });
+        }
+
+        return {
+          username: player.username,
+          userId: player._id,
+          finalScore: player.score,
+          timeline: timelinePoints
+        };
+      })
+    );
+
+    // Merge all timelines into hourly buckets for chart display
+    // Find all unique timestamps and create hourly aggregates
+    const allTimestamps = new Set();
+    progressionData.forEach(pd => {
+      pd.timeline.forEach(tp => {
+        const hourStart = new Date(tp.time);
+        hourStart.setMinutes(0, 0, 0);
+        allTimestamps.add(hourStart.getTime());
+      });
+    });
+
+    const sortedTimestamps = Array.from(allTimestamps).sort((a, b) => a - b);
+    
+    // Build chart data
+    const chartData = sortedTimestamps.map(timestamp => {
+      const point = { time: new Date(timestamp).toISOString() };
+      
+      progressionData.forEach(playerData => {
+        // Find the score at or before this timestamp
+        let score = 0;
+        for (let i = playerData.timeline.length - 1; i >= 0; i--) {
+          if (new Date(playerData.timeline[i].time) <= new Date(timestamp)) {
+            score = playerData.timeline[i].score;
+            break;
+          }
+        }
+        point[playerData.username] = score;
+      });
+      
+      return point;
+    });
+
+    res.json({ 
+      event,
+      players: progressionData.map(pd => ({ 
+        username: pd.username, 
+        finalScore: pd.finalScore 
+      })),
+      chartData 
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/leaderboard/:eventId - Get leaderboard data as JSON (for Streaming Mode)
+router.get('/leaderboard/:eventId', async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+
+    // Verify event exists
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Fetch leaderboard for this event
+    const players = await User.find({ 
+      eventId, 
+      role: 'player' 
+    })
+      .select('username score createdAt')
+      .sort({ score: -1, createdAt: 1 });
+
+    // Get solve counts for each player
+    const leaderboard = await Promise.all(
+      players.map(async (player, index) => {
+        const solveCount = await Submission.countDocuments({
+          userId: player._id,
+          isCorrect: true
+        });
+
+        return {
+          rank: index + 1,
+          username: player.username,
+          score: player.score,
+          solveCount
+        };
+      })
+    );
+
+    res.json({ event, leaderboard });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/admin/leaderboard/:eventId/export - Export leaderboard as PDF
 router.get('/leaderboard/:eventId/export', async (req, res, next) => {
   try {
@@ -582,6 +730,105 @@ router.get('/leaderboard/:eventId/export', async (req, res, next) => {
 
     // Finalize PDF
     doc.end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============ CATEGORIES ============
+
+// GET /api/admin/categories - Get all categories (optionally filter by event)
+router.get('/categories', async (req, res, next) => {
+  try {
+    const { eventId } = req.query;
+    const query = eventId ? { eventId } : {};
+
+    const categories = await Category.find(query)
+      .populate('eventId', 'name')
+      .sort({ name: 1 });
+
+    res.json({ categories });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/categories - Create category
+router.post('/categories', async (req, res, next) => {
+  try {
+    const { name, description, color, eventId } = req.body;
+
+    if (!name || !eventId) {
+      return res.status(400).json({ message: 'Category name and eventId are required' });
+    }
+
+    // Verify event exists
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Check if category already exists for this event
+    const existing = await Category.findOne({ name, eventId });
+    if (existing) {
+      return res.status(400).json({ message: 'Category already exists for this event' });
+    }
+
+    const category = await Category.create({
+      name: name.trim(),
+      description: description || '',
+      color: color || '#3b82f6',
+      eventId
+    });
+
+    res.status(201).json({ category });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/admin/categories/:id - Update category
+router.put('/categories/:id', async (req, res, next) => {
+  try {
+    const { name, description, color } = req.body;
+
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      { name: name ? name.trim() : undefined, description, color },
+      { new: true, runValidators: true }
+    );
+
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    res.json({ category });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/admin/categories/:id - Delete category
+router.delete('/categories/:id', async (req, res, next) => {
+  try {
+    const category = await Category.findById(req.params.id);
+
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    // Check if any challenges use this category
+    const challengeCount = await Challenge.countDocuments({ category: category.name, eventId: category.eventId });
+
+    if (challengeCount > 0) {
+      return res.status(400).json({ 
+        message: `Cannot delete category with ${challengeCount} associated challenge(s)` 
+      });
+    }
+
+    await Category.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Category deleted successfully' });
   } catch (error) {
     next(error);
   }

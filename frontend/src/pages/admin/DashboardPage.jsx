@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../../components/ui';
-import { Calendar, Users, Flag, Trophy, Plus, Copy, CheckCircle, Trash2, X, Download } from 'lucide-react';
+import { Calendar, Users, Flag, Trophy, Plus, Copy, CheckCircle, Trash2, X, Download, MonitorPlay } from 'lucide-react';
 import { formatDate, cn } from '../../lib/utils';
 import { useDialog } from '../../context/DialogContext';
 import CategoryDistributionChart from '../../components/charts/CategoryDistributionChart';
@@ -266,16 +266,26 @@ export default function DashboardPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleExportLeaderboard(event.id, event.name)}
-                      className="flex-1"
+                      className="whitespace-nowrap px-2"
                       title="Download leaderboard as PDF"
                     >
                       <Download className="w-4 h-4 mr-1" />
                       Export
                     </Button>
                     <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/admin/stream?eventId=${event.id}`, '_blank')}
+                      className="whitespace-nowrap px-2"
+                      title="Open Streamer Mode Broadcast"
+                    >
+                      <MonitorPlay className="w-4 h-4 mr-1" />
+                      Stream View
+                    </Button>
+                    <Button
                       variant={event.isActive ? "outline" : "default"}
                       size="sm"
-                      className={cn("flex-1 transition-all", !event.isActive && "bg-primary text-background")}
+                      className={cn("flex-1 px-1 transition-all", !event.isActive && "bg-primary text-background")}
                       onClick={() => handleToggleActive(event.id, event.isActive)}
                     >
                       {event.isActive ? 'Deactivate' : 'Activate'}

@@ -21,7 +21,9 @@ import CreateChallengePage from './pages/admin/CreateChallengePage';
 // Admin pages
 import DashboardPage from './pages/admin/DashboardPage';
 import AdminChallengesPage from './pages/admin/ChallengesPage';
+import AdminCategoriesPage from './pages/admin/CategoriesPage';
 import UsersPage from './pages/admin/UsersPage';
+import StreamerModePage from './pages/admin/StreamerModePage';
 
 // Loading spinner
 function LoadingScreen() {
@@ -163,6 +165,16 @@ export default function App() {
         }
       />
       <Route
+        path="/admin/categories"
+        element={
+          <AdminRoute>
+            <AdminLayout>
+              <AdminCategoriesPage />
+            </AdminLayout>
+          </AdminRoute>
+        }
+      />
+      <Route
         path="/admin/challenges/new"
         element={
           <AdminRoute>
@@ -179,6 +191,14 @@ export default function App() {
             <AdminLayout>
               <UsersPage />
             </AdminLayout>
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/stream"
+        element={
+          <AdminRoute>
+            <StreamerModePage />
           </AdminRoute>
         }
       />

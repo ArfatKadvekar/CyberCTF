@@ -1,11 +1,11 @@
 import express from 'express';
-import crypto from 'crypto';
 import { User, Event } from '../models/index.js';
 import { generateToken, authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // POST /api/auth/join - Player joins event with username + PIN
+// ✓ FIXED: Removed sessionToken assignment to allow multiple simultaneous sessions
 router.post('/join', async (req, res, next) => {
   try {
     const { username, gamePin } = req.body;
@@ -47,10 +47,9 @@ router.post('/join', async (req, res, next) => {
       status = 201;
     }
 
-    // Assign a new session token, invalidating any old ones
-    player.sessionToken = crypto.randomBytes(16).toString('hex');
-    await player.save();
-
+    // ✓ FIXED: Removed sessionToken assignment - JWT handles session validity via expiration
+    // Multiple simultaneous logins are now supported
+    
     const token = generateToken(player);
 
     res.status(status).json({
@@ -75,6 +74,7 @@ router.post('/join', async (req, res, next) => {
 });
 
 // POST /api/auth/admin/login - Admin login with username + password
+// ✓ FIXED: Removed sessionToken assignment to allow multiple simultaneous sessions
 router.post('/admin/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
@@ -95,10 +95,9 @@ router.post('/admin/login', async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Assign a new session token, invalidating old admin sessions
-    admin.sessionToken = crypto.randomBytes(16).toString('hex');
-    await admin.save();
-
+    // ✓ FIXED: Removed sessionToken assignment - JWT handles session validity via expiration
+    // Multiple simultaneous admin logins are now supported
+    
     const token = generateToken(admin);
 
     res.json({
@@ -207,12 +206,12 @@ router.post('/register-admin', async (req, res, next) => {
     }
 
     // Create admin user
+    // ✓ FIXED: Removed sessionToken assignment - JWT handles session validity via expiration
     const admin = await User.create({
       username: email.split('@')[0],
       email: email.toLowerCase(),
       password,
-      role: 'admin',
-      sessionToken: crypto.randomBytes(16).toString('hex')
+      role: 'admin'
     });
 
     const token = generateToken(admin);

@@ -6,13 +6,12 @@ import { Plus, Edit, Trash2, X, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useDialog } from '../../context/DialogContext';
 
-const categories = ['Web', 'Crypto', 'Forensics', 'OSINT', 'Misc', 'Reverse', 'Pwn'];
 const difficulties = ['Easy', 'Medium', 'Hard'];
 
 const defaultChallenge = {
   title: '',
   description: '',
-  category: 'Web',
+  category: '',
   difficulty: 'Easy',
   points: 100,
   flag: '',
@@ -24,6 +23,7 @@ const defaultChallenge = {
 
 export default function AdminChallengesPage() {
   const [challenges, setChallenges] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState('');
@@ -36,14 +36,35 @@ export default function AdminChallengesPage() {
   const [copying, setCopying] = useState(false);
   const { showAlert, showConfirm } = useDialog();
 
-  const fetchData = async () => {
+  // First load: Get events and auto-select first one
+  useEffect(() => {
+    const initializeEvents = async () => {
+      try {
+        const eventsRes = await adminApi.getEvents();
+        setEvents(eventsRes.data.events);
+        
+        // Auto-select first event if none selected
+        if (eventsRes.data.events.length > 0 && !selectedEvent) {
+          setSelectedEvent(eventsRes.data.events[0]._id);
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      }
+    };
+
+    initializeEvents();
+  }, []); // Only run on mount
+
+  // Fetch challenges and categories when event is selected
+  const refetchChallengesAndCategories = async (eventId) => {
     try {
-      const [challengesRes, eventsRes] = await Promise.all([
-        adminApi.getChallenges(selectedEvent || undefined),
-        adminApi.getEvents()
+      setLoading(true);
+      const [challengesRes, categoriesRes] = await Promise.all([
+        adminApi.getChallenges(eventId),
+        adminApi.getCategories(eventId)
       ]);
       setChallenges(challengesRes.data.challenges);
-      setEvents(eventsRes.data.events);
+      setCategories(categoriesRes.data.categories);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -52,7 +73,8 @@ export default function AdminChallengesPage() {
   };
 
   useEffect(() => {
-    fetchData();
+    if (!selectedEvent) return;
+    refetchChallengesAndCategories(selectedEvent);
   }, [selectedEvent]);
 
   const openEditModal = (challenge) => {
@@ -86,7 +108,7 @@ export default function AdminChallengesPage() {
         await adminApi.createChallenge(formData);
       }
       setShowModal(false);
-      fetchData();
+      refetchChallengesAndCategories(selectedEvent);
     } catch (error) {
       console.error('Save challenge error:', error.response?.data || error.message);
       setModalError(error.response?.data?.message || 'Error saving challenge. Check console for details.');
@@ -102,7 +124,7 @@ export default function AdminChallengesPage() {
     try {
       await adminApi.createChallenge({ ...formData, eventId: copyEventId });
       setShowModal(false);
-      fetchData();
+      refetchChallengesAndCategories(selectedEvent);
     } catch (error) {
       console.error('Copy error:', error.response?.data || error.message);
       setModalError(error.response?.data?.message || 'Error copying challenge.');
@@ -120,7 +142,7 @@ export default function AdminChallengesPage() {
       onConfirm: async () => {
         try {
           await adminApi.deleteChallenge(id);
-          fetchData();
+          refetchChallengesAndCategories(selectedEvent);
         } catch (error) {
           showAlert('Error', error.response?.data?.message || 'Error deleting challenge', 'destructive');
         }
@@ -341,11 +363,16 @@ export default function AdminChallengesPage() {
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className="px-3 py-2 rounded-lg border border-border bg-input text-foreground"
+                      required
                     >
+                      <option value="">Select Category</option>
                       {categories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat._id || cat.name} value={cat.name}>{cat.name}</option>
                       ))}
                     </select>
+                    {categories.length === 0 && (
+                      <p className="text-xs text-amber-500">⚠ No categories found. Create one from the Categories page.</p>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium text-foreground">Difficulty</label>

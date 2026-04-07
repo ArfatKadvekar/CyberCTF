@@ -7,12 +7,12 @@ import { cn } from '../../lib/utils';
 import axios from 'axios';
 import { useDialog } from '../../context/DialogContext';
 
-const categories = ['Web', 'Crypto', 'Forensics', 'OSINT', 'Misc', 'Reverse', 'Pwn'];
 const difficulties = ['Easy', 'Medium', 'Hard'];
 
 export default function CreateChallengePage() {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -22,7 +22,7 @@ export default function CreateChallengePage() {
     eventId: '',
     title: '',
     description: '',
-    category: 'Web',
+    category: '',
     difficulty: 'Easy',
     points: 100,
     flagPrefix: 'pictCTF',
@@ -50,6 +50,34 @@ export default function CreateChallengePage() {
     };
     fetchEvents();
   }, []);
+
+  // Fetch categories when eventId changes
+  useEffect(() => {
+    if (!formData.eventId) {
+      setCategories([]);
+      return;
+    }
+
+    const fetchCategories = async () => {
+      try {
+        const res = await adminApi.getCategories(formData.eventId);
+        setCategories(res.data.categories || []);
+        
+        // Auto-select first category if available
+        if (res.data.categories && res.data.categories.length > 0) {
+          setFormData(prev => ({ ...prev, category: res.data.categories[0].name }));
+        } else {
+          setFormData(prev => ({ ...prev, category: '' }));
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategories([]);
+        setFormData(prev => ({ ...prev, category: '' }));
+      }
+    };
+
+    fetchCategories();
+  }, [formData.eventId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -366,10 +394,15 @@ export default function CreateChallengePage() {
                     value={formData.category}
                     onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
                     className="px-3 py-2.5 rounded-lg border border-border bg-black text-foreground text-sm font-mono"
+                    required
                   >
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
+                    {categories.length === 0 ? (
+                      <option value="" disabled>No categories available</option>
+                    ) : (
+                      categories.map((cat) => (
+                        <option key={cat._id} value={cat.name}>{cat.name}</option>
+                      ))
+                    )}
                   </select>
                 </div>
 

@@ -1,30 +1,37 @@
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import { adminApi } from '../../lib/api';
+import { useCategories } from '../../context/CategoriesContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';
 
-const CATEGORY_COLORS = {
-  'Web': '#3b82f6',
-  'Crypto': '#10b981',
-  'Forensics': '#a855f7',
-  'OSINT': '#f59e0b',
-  'Misc': '#ec4899',
-  'Reverse': '#06b6d4',
-  'Pwn': '#ef4444'
-};
+// Fallback color palette if category doesn't have a stored color
+const FALLBACK_COLORS = [
+  '#3b82f6', // Blue
+  '#10b981', // Green
+  '#a855f7', // Purple
+  '#f59e0b', // Amber
+  '#ef4444', // Red
+  '#06b6d4', // Cyan
+  '#ec4899', // Pink
+  '#8b5cf6', // Violet
+  '#f97316', // Orange
+  '#06b6d4', // Teal
+];
 
 export default function CategoryDistributionChart({ eventId }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { getColorForCategory } = useCategories();
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
         const response = await adminApi.getAnalytics(eventId);
-        setData(response.data.categoryDistribution);
+        setData(response.data.categoryDistribution || []);
       } catch (error) {
-        console.error('Error fetching analytics:', error);
+        console.error('[CategoryDistributionChart] Error fetching analytics:', error);
+        setData([]);
       } finally {
         setLoading(false);
       }
@@ -61,6 +68,16 @@ export default function CategoryDistributionChart({ eventId }) {
     );
   }
 
+  // Get color for each category, using context or fallback
+  const getColor = (categoryName, index) => {
+    try {
+      return getColorForCategory(categoryName);
+    } catch (err) {
+      console.warn(`[CategoryDistributionChart] Could not get color for ${categoryName}, using fallback`);
+      return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+    }
+  };
+
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
       <CardHeader>
@@ -81,7 +98,10 @@ export default function CategoryDistributionChart({ eventId }) {
               dataKey="count"
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.category] || '#8884d8'} />
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={getColor(entry.category, index)} 
+                />
               ))}
             </Pie>
             <Tooltip

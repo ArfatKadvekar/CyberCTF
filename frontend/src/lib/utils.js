@@ -5,17 +5,31 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+// Legacy predefined classes for backwards compatibility
+const LEGACY_CATEGORY_CLASSES = {
+  Web: 'badge-web',
+  Crypto: 'badge-crypto',
+  Forensics: 'badge-forensics',
+  OSINT: 'badge-osint',
+  Misc: 'badge-misc',
+  Reverse: 'badge-reverse',
+  Pwn: 'badge-pwn'
+};
+
+/**
+ * Get CSS class for category badge
+ * Supports legacy hardcoded categories and dynamic ones
+ * For dynamic categories, generates a fallback class
+ */
 export function getCategoryClass(category) {
-  const classes = {
-    Web: 'badge-web',
-    Crypto: 'badge-crypto',
-    Forensics: 'badge-forensics',
-    OSINT: 'badge-osint',
-    Misc: 'badge-misc',
-    Reverse: 'badge-reverse',
-    Pwn: 'badge-pwn'
-  };
-  return classes[category] || 'badge-misc';
+  // Check if it's a legacy predefined category
+  if (LEGACY_CATEGORY_CLASSES[category]) {
+    return LEGACY_CATEGORY_CLASSES[category];
+  }
+  
+  // For dynamic categories, use a generic fallback class
+  // The color will be applied via inline styles from context
+  return 'badge-dynamic';
 }
 
 export function getDifficultyClass(difficulty) {

@@ -1,253 +1,352 @@
 # WTL CTF Platform 🚩
 
-A full-stack Capture The Flag (CTF) competition platform built with MERN stack (MongoDB, Express, React, Node.js) and Vite.
+A full-stack Capture The Flag (CTF) competition platform built with **MERN stack** (MongoDB, Express, React, Node.js) and Vite. Perfect for hosting competitive CTF events, workshops, and training challenges.
 
-## 🔐 Security Notice
+---
 
-**Flags are NOW hashed with BCrypt and NEVER exposed!**
-- Plaintext flags stored in database: ❌ **NO** (only BCrypt hashes)
-- Flags in API responses: ❌ **NO** (automatically excluded)
-- Plaintext in browser: ❌ **NO** (server-side validation only)
+## 🎯 Features
 
-See [FLAG_SECURITY_SUMMARY.md](./FLAG_SECURITY_SUMMARY.md) for details.
+### Player Features
+- ✅ Join events with PIN-based authentication
+- ✅ Solve challenges across multiple categories  
+- ✅ Submit flags with instant validation
+- ✅ Live leaderboard with real-time rankings
+- ✅ Unlock hints by earning points
+- ✅ Track personal progress and statistics
+- ✅ Professional dashboard with analytics
 
-## Features
+### Admin Features
+- ✅ Create and manage CTF events
+- ✅ Design challenges with custom categories
+- ✅ Create and manage hints
+- ✅ Manage users and permissions
+- ✅ Analytics dashboard with real-time data
+- ✅ Streamer mode for broadcasting events
+- ✅ Comprehensive event management
 
-### 🎮 Player Features
-- Join events with PIN-based authentication
-- Solve CTF challenges across multiple categories
-- Submit flags and get instant feedback
-- View live leaderboard with real-time rankings
-- Track personal progress and statistics
-- Unlock hints (earn points by solving)
-- View challenge details and attachments
+### Security
+- ✅ **Flags hashed with BCrypt** (never exposed)
+- ✅ Passwords securely hashed with bcryptjs
+- ✅ JWT-based authentication
+- ✅ Environment variables protected
+- ✅ CORS configured
 
-### 👨‍💼 Admin Features
-- Create and manage CTF events
-- Design challenges with custom categories
-- Create hints for challenges
-- Manage users and permissions
-- View comprehensive analytics dashboard
-  - Category distribution pie charts
-  - Solve rate analysis
-  - Submission activity timeline
-  - Real-time user rankings
-- Export leaderboards as PDF
-- Monitor submissions in real-time
+---
 
-### 📊 Analytics & Visualizations
-- Interactive charts with recharts
-- Real-time leaderboard updates (5-second polling)
-- PDF export functionality with pdfkit
-- User rank tracking
-- Category completion analysis
-- Solve rate statistics
-
-## Tech Stack
+## 🛠 Tech Stack
 
 ### Frontend
-- **React** 18.3.1 - UI framework
-- **Vite** - Fast build tool and dev server
-- **Tailwind CSS** 3.4.13 - Utility-first CSS
-- **Recharts** 3.8.1 - Interactive data visualization
-- **Lucide React** - Beautiful icon library
-- **Axios** - HTTP client with JWT interceptors
+- **React** 18+ – UI Framework
+- **Vite** – Lightning-fast build tool
+- **Tailwind CSS** – Utility-first styling
+- **Recharts** – Interactive data visualization
+- **Lucide React** – Icon library
+- **Axios** – HTTP client
 
 ### Backend
-- **Node.js** v22+ - JavaScript runtime
-- **Express.js** 4.21.0 - Web framework
-- **MongoDB** 8.6.0 with Mongoose - NoSQL database
-- **JWT** (jsonwebtoken) - Stateless authentication
-- **bcryptjs** - Password hashing
-- **pdfkit** 0.13.0 - PDF generation
-- **CORS** - Cross-origin resource sharing
+- **Node.js** v22+ – JavaScript runtime
+- **Express.js** – Web framework
+- **MongoDB** + Mongoose – NoSQL database
+- **JWT** – Stateless authentication
+- **bcryptjs** – Password hashing
 
 ### Deployment
-- **Vercel** - Serverless deployment platform
-- **MongoDB Atlas** - Cloud database hosting
-- **Git** - Version control
+- **Vercel** – Frontend hosting
+- **Render/Railway** – Backend hosting
+- **MongoDB Atlas** – Cloud database
 
-## Project Architecture
+---
 
-```
-├── backend/                      # Node.js Express API
-│   ├── models/                   # Mongoose schemas
-│   │   ├── User.js              # User accounts (admin/player)
-│   │   ├── Event.js             # CTF events
-│   │   ├── Challenge.js         # Challenge definitions
-│   │   ├── Submission.js        # Flag submissions
-│   │   └── UnlockedHint.js      # Hint unlock tracking
-│   ├── routes/                   # API endpoints
-│   │   ├── auth.js              # Login/signup endpoints
-│   │   ├── challenges.js        # Challenge CRUD
-│   │   ├── admin.js             # Admin-only endpoints
-│   │   ├── leaderboard.js       # Leaderboard endpoints
-│   │   ├── user.js              # User profile & ranking
-│   │   └── index.js             # Route aggregation
-│   ├── middleware/               # Express middleware
-│   │   ├── auth.js              # JWT verification
-│   │   └── errorHandler.js      # Error handling
-│   ├── server.js                # Server entry point
-│   ├── seed.js                  # Database seeding
-│   └── vercel.json              # Vercel deployment config
-│
-├── frontend/                     # React Vite application
-│   ├── src/
-│   │   ├── pages/               # Page components
-│   │   │   ├── admin/
-│   │   │   │   ├── DashboardPage.jsx      # Analytics
-│   │   │   │   ├── ChallengesPage.jsx     # Manage challenges
-│   │   │   │   ├── CreateChallengePage.jsx # Create challenge
-│   │   │   │   └── UsersPage.jsx          # Manage users
-│   │   │   ├── player/
-│   │   │   │   ├── HomePage.jsx
-│   │   │   │   ├── ChallengesPage.jsx     # Browse challenges
-│   │   │   │   ├── ChallengePage.jsx      # Solve challenge
-│   │   │   │   ├── LeaderboardPage.jsx    # Leaderboard & charts
-│   │   │   │   └── ProfilePage.jsx
-│   │   │   ├── AdminLoginPage.jsx
-│   │   │   └── JoinPage.jsx               # Join event with PIN
-│   │   ├── components/
-│   │   │   ├── charts/                    # Chart components
-│   │   │   │   ├── LeaderboardHistoryChart.jsx
-│   │   │   │   ├── CategoryDistributionChart.jsx
-│   │   │   │   ├── SolveRatesChart.jsx
-│   │   │   │   └── ActivityChart.jsx
-│   │   │   ├── UserRankDisplay.jsx        # Real-time rank display
-│   │   │   └── ui/                        # Reusable UI components
-│   │   ├── layouts/
-│   │   │   ├── PlayerLayout.jsx
-│   │   │   └── AdminLayout.jsx
-│   │   ├── lib/
-│   │   │   ├── api.js                     # API client
-│   │   │   └── utils.js                   # Utilities
-│   │   ├── context/
-│   │   │   ├── SessionContext.jsx         # Auth state
-│   │   │   └── DialogContext.jsx          # Dialog/alert state
-│   │   └── main.jsx                       # App entry point
-│   ├── vite.config.js
-│   ├── vercel.json                        # Vercel deployment config
-│   └── package.json
-│
-├── DEPLOYMENT.md                # Vercel deployment guide
-├── SECURITY.md                  # Security audit & recommendations
-├── QUICKSTART.md                # Local development setup
-└── README.md                    # This file
+## 🚀 Quick Start
 
-```
+### Prerequisites
+- Node.js v22+ and npm
+- MongoDB (local or MongoDB Atlas)
+- Git
 
-## Getting Started
+### Local Development
 
-### Local Development (5 minutes)
-
-See **[QUICKSTART.md](./QUICKSTART.md)** for detailed setup instructions.
-
-Quick version:
+**1. Clone and setup backend:**
 ```bash
-# Backend
 cd backend
 npm install
-npm run seed
-npm start
-# Runs on http://localhost:5000
-
-# Frontend (in new terminal)
-cd frontend
-npm install
-npm run dev
-# Runs on http://localhost:5173
 ```
 
-### Production Deployment on Vercel
+**2. Configure backend environment:**
+Create `.env` with:
+```
+MONGO_URI=mongodb://localhost:27017/ctf
+JWT_SECRET=your-secure-secret-key-here
+NODE_ENV=development
+PORT=5000
+```
 
-See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for complete deployment guide.
+**3. Seed database (optional):**
+```bash
+npm run seed
+```
 
-Quick steps:
-1. Create Vercel account and projects for frontend & backend
-2. Connect GitHub repository
-3. Configure environment variables in Vercel dashboard
-4. Deploy!
+**4. Start backend:**
+```bash
+npm start
+# Server runs on http://localhost:5000
+```
 
-## API Endpoints
+**5. In a new terminal, setup frontend:**
+```bash
+cd frontend
+npm install
+```
+
+**6. Configure frontend environment:**
+Create `.env.local` with:
+```
+VITE_API_URL=http://localhost:5000/api
+```
+
+**7. Start frontend:**
+```bash
+npm run dev
+# Frontend runs on http://localhost:5173
+```
+
+### Default Credentials (After Seeding)
+- **Admin** – Username: `admin` | Password: `admin123`
+- **Admin Panel** – http://localhost:5173/admin/login
+- **Join PIN** – `4K80P9` (or check seeded value)
+- **Player Join** – http://localhost:5173/join
+
+⚠️ **Change these before production!**
+
+---
+
+## 📁 Project Structure
+
+```
+CyberCTF/
+├── backend/                          # Express API
+│   ├── models/                       # Mongoose schemas
+│   │   ├── User.js                   # Admin & player accounts
+│   │   ├── Event.js                  # CTF events
+│   │   ├── Challenge.js              # Challenge definitions
+│   │   ├── Submission.js             # Flag submissions
+│   │   ├── UnlockedHint.js           # Hint tracking
+│   │   └── Category.js               # Challenge categories
+│   ├── routes/                       # API endpoints
+│   │   ├── auth.js                   # Login/join
+│   │   ├── challenges.js             # Challenge CRUD
+│   │   ├── admin.js                  # Admin operations
+│   │   ├── leaderboard.js            # Rankings
+│   │   ├── user.js                   # User profiles
+│   │   └── categories.js             # Category management
+│   ├── middleware/
+│   │   ├── auth.js                   # JWT verification
+│   │   └── errorHandler.js           # Error handling
+│   ├── utils/
+│   │   └── logger.js                 # Logging utility
+│   ├── server.js                     # Server entry point
+│   ├── vercel.json                   # Vercel config
+│   └── package.json
+│
+├── frontend/                         # React + Vite
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── admin/                # Admin pages
+│   │   │   │   ├── DashboardPage.jsx
+│   │   │   │   ├── ChallengesPage.jsx
+│   │   │   │   ├── StreamerModePage.jsx
+│   │   │   │   └── UsersPage.jsx
+│   │   │   ├── player/               # Player pages
+│   │   │   │   ├── HomePage.jsx
+│   │   │   │   ├── ChallengesPage.jsx
+│   │   │   │   ├── ChallengePage.jsx
+│   │   │   │   ├── LeaderboardPage.jsx
+│   │   │   │   └── ProfilePage.jsx
+│   │   │   ├── AdminLoginPage.jsx
+│   │   │   └── JoinPage.jsx
+│   │   ├── components/               # UI components
+│   │   │   ├── charts/               # Data visualization
+│   │   │   ├── ui/                   # Reusable UI
+│   │   │   └── /leaderboard components
+│   │   ├── context/                  # React context
+│   │   │   ├── SessionContext.jsx
+│   │   │   ├── CategoriesContext.jsx
+│   │   │   └── DialogContext.jsx
+│   │   ├── layouts/
+│   │   ├── lib/
+│   │   │   ├── api.js                # API client
+│   │   │   └── utils.js
+│   │   └── main.jsx
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── vercel.json
+│   └── package.json
+│
+├── .gitignore
+├── README.md                         # This file
+└── SECURITY.md                       # Security information
+```
+
+---
+
+## 📚 API Endpoints
 
 ### Authentication
-- `POST /api/auth/admin/login` - Admin login
-- `POST /api/auth/join` - Player join event
-- `POST /api/auth/logout` - Logout
+```
+POST   /api/auth/admin/login          Admin login
+POST   /api/auth/join                 Join event with PIN
+POST   /api/auth/logout               Logout
+```
 
 ### Challenges
-- `GET /api/challenges` - List challenges
-- `GET /api/challenges/:id` - Get challenge details
-- `POST /api/challenges` (admin) - Create challenge
-- `PUT /api/challenges/:id` (admin) - Update challenge
-- `DELETE /api/challenges/:id` (admin) - Delete challenge
-- `POST /api/challenges/:id/submit` - Submit flag
+```
+GET    /api/challenges                List challenges
+GET    /api/challenges/:id            Get challenge details
+POST   /api/challenges                Create (admin)
+PUT    /api/challenges/:id            Update (admin)
+DELETE /api/challenges/:id            Delete (admin)
+POST   /api/challenges/:id/submit     Submit flag
+GET    /api/challenges/:id/hints      Get hints
+POST   /api/challenges/:id/unlock-hint Unlock hint
+```
+
+### Categories
+```
+GET    /api/categories                List categories
+POST   /api/admin/categories          Create (admin)
+```
 
 ### Leaderboard
-- `GET /api/leaderboard` - Get current leaderboard
-- `GET /api/leaderboard/history` - Get score progression
-- `GET /api/user/rank` - Get current user rank
+```
+GET    /api/leaderboard               Current rankings
+GET    /api/leaderboard/history       Score progression
+GET    /api/user/rank                 User's rank
+```
 
 ### Admin
-- `GET /api/admin/analytics/:eventId` - Get analytics data
-- `GET /api/admin/leaderboard/:eventId/export` - Export PDF
+```
+GET    /api/admin/events              List events
+GET    /api/admin/events/:id          Event details
+POST   /api/admin/events              Create event
+```
 
-### Hints
-- `GET /api/challenges/:id/hints` - Get available hints
-- `POST /api/challenges/:id/unlock-hint` - Unlock hint (costs points)
+---
 
-## Default Credentials
+## 🔒 Security Highlights
 
-After seeding the database:
+**Flag Protection:**
+- Flags are hashed with BCrypt before storage
+- Never exposed in API responses
+- Constant-time comparison (prevents timing attacks)
+- Brute force resistant
 
-**Admin Panel:**
-- Username: `admin`
-- Password: `admin123`
-- URL: `/admin/login`
+**Authentication:**
+- JWT tokens for stateless auth
+- Password hashing with bcryptjs
+- Secure session management
 
-**Player Join:**
-- PIN: `4K80P9` (or generated during seed)
-- URL: `/join`
+**Best Practices:**
+- Environment variables for sensitive data
+- CORS properly configured
+- Error messages don't leak information
+- Audit logging for suspicious activity
 
-⚠️ **Change these credentials before production deployment!**
+See [SECURITY.md](./SECURITY.md) for complete details.
 
-## Security
+---
 
-⭐ **CRITICAL: Flags are securely hashed!**
+## 🌐 Deployment
 
-See comprehensive documentation:
-- [FLAG_SECURITY_SUMMARY.md](./FLAG_SECURITY_SUMMARY.md) - Quick overview of changes
-- [FLAG_SECURITY_IMPLEMENTATION.md](./FLAG_SECURITY_IMPLEMENTATION.md) - Technical deep dive
-- [SECURITY.md](./SECURITY.md) - Complete security audit
+### Environment Variables
 
-**Flag Protection Features:**
-- ✅ Flags hashed with BCrypt before storage (one-way, salted, expensive)
-- ✅ Flaghashes NEVER exposed in API responses (`.select('-flagHash')`)
-- ✅ Flag validation uses constant-time comparison (prevents timing attacks)
-- ✅ Incorrect submissions logged for audit, correct ones store null
-- ✅ Admin endpoints also hide flags (defense in depth)
-- ✅ Brute force resistant (~100ms per guess with BCrypt)
-- ✅ All error responses generic (no hints to players)
+**Backend (.env):**
+```
+MONGO_URI=your_mongodb_atlas_uri
+JWT_SECRET=your_secure_secret_key
+NODE_ENV=production
+PORT=5000
+CORS_ORIGIN=https://yourfrontend.vercel.app
+```
 
-**Other Security Features:**
-- ✅ Passwords hashed with bcryptjs
-- ✅ JWT-based authentication  
-- ✅ Environment variables protected (.gitignore)
-- ✅ CORS configured
-- ⚠️ Generate new JWT_SECRET for production
-- ⚠️ Restrict MongoDB IP whitelist in production
+**Frontend (.env):**
+```
+VITE_API_URL=https://yourbackend.onrender.com/api
+```
 
-## Key Features Implementation
+### Deploy on Vercel (Frontend)
+1. Push to GitHub
+2. Create Vercel account and link repository
+3. Set environment variables in Vercel dashboard
+4. Deploy!
+
+### Deploy on Render/Railway (Backend)
+1. Push to GitHub
+2. Create new service on Render/Railway
+3. Connect GitHub repository
+4. Set environment variables
+5. Deploy!
+
+---
+
+## 📊 Key Components
+
+### Streamer Mode
+Professional live broadcast dashboard showing:
+- Score progression line chart (top 5 players)
+- Top 3 player highlight cards with medals
+- Full leaderboard table
+- Event statistics panel
 
 ### Analytics Dashboard
 - Category distribution pie chart
-- Solve rate bar chart  
-- Submission activity timeline
-- Real-time user rank display
-- PDF leaderboard export
+- Solve rate bar chart
+- Event participant statistics
+- Real-time leaderboard
 
-### Real-time Features
-- User rank updates every 5 seconds
+### Responsive Design
+- Works on desktop, tablet, and mobile
+- Professional dark theme
+- Optimized performance
+
+---
+
+## 🐛 Troubleshooting
+
+**Port already in use:**
+```bash
+# Kill process on port 5000 (backend) or 5173 (frontend)
+npx kill-port 5000
+```
+
+**MongoDB connection error:**
+- Check MONGO_URI is correct
+- Ensure MongoDB is running locally or Atlas is accessible
+- Check firewall/network settings
+
+**API errors:**
+- Check backend is running on correct port
+- Verify VITE_API_URL in frontend .env
+- Check browser console for detailed errors
+
+---
+
+## 📝 License
+
+Private repository - Contact for licensing information
+
+---
+
+## 🤝 Support
+
+For issues or questions:
+1. Check [SECURITY.md](./SECURITY.md) for security concerns
+2. Review API documentation above
+3. Check console logs and error messages
+4. Review component code comments
+
+---
+
+**Built with ❤️ for competitive CTF events**
 - Live leaderboard updates
 - Instant flag submission feedback
 - Real-time chart updates

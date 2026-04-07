@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { challengesApi } from '../../lib/api';
+import { categoriesApi, challengesApi } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, CategoryBadge, DifficultyBadge } from '../../components/ui';
 import { Search, Filter, CheckCircle, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const categories = ['All', 'Web', 'Crypto', 'Forensics', 'OSINT', 'Misc', 'Reverse', 'Pwn'];
 const difficulties = ['All', 'Easy', 'Medium', 'Hard'];
 
 export default function ChallengesPage() {
   const [challenges, setChallenges] = useState([]);
+  const [categories, setCategories] = useState(['All']);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -17,18 +17,26 @@ export default function ChallengesPage() {
   const [showSolved, setShowSolved] = useState(true);
 
   useEffect(() => {
-    const fetchChallenges = async () => {
+    const fetchData = async () => {
       try {
-        const response = await challengesApi.getAll();
-        setChallenges(response.data.challenges);
+        const [challengesRes, categoriesRes] = await Promise.all([
+          challengesApi.getAll(),
+          categoriesApi.get()
+        ]);
+        setChallenges(challengesRes.data.challenges);
+        
+        if (categoriesRes.data.categories) {
+          const dynamicCategories = categoriesRes.data.categories.map(c => c.name);
+          setCategories(['All', ...dynamicCategories]);
+        }
       } catch (error) {
-        console.error('Error fetching challenges:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchChallenges();
+    fetchData();
   }, []);
 
   const filteredChallenges = challenges.filter((challenge) => {

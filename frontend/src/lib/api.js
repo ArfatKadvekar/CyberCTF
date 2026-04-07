@@ -8,20 +8,15 @@ const getBaseURL = () => {
   const url = import.meta.env.VITE_API_URL;
   
   if (url && url.trim() !== '') {
-    console.log('[API] ✓ Using VITE_API_URL environment variable:', url);
     return url.trim();
   }
 
   // Fallback if VITE_API_URL is missing
   if (import.meta.env.DEV) {
-    console.log('[API] ℹ Development mode: using /api proxy');
     return '/api'; // Use Vite proxy for local dev
   }
   
-  const backendURL = 'https://cyberctf.onrender.com/api';
-  console.log('[API] ⚠ Using hardcoded production backend (VITE_API_URL not set):', backendURL);
-  console.log('[API] → Tip: Set VITE_API_URL in Vercel dashboard for better flexibility');
-  return backendURL;
+  return 'https://cyberctf.onrender.com/api';
 };
 
 const api = axios.create({
@@ -99,6 +94,11 @@ export const challengesApi = {
   unlockHint: (challengeId, hintIndex) => api.post(`/challenges/${challengeId}/hints/${hintIndex}/unlock`)
 };
 
+// Categories API
+export const categoriesApi = {
+  get: (eventId) => api.get('/categories', { params: { eventId } })
+};
+
 // Leaderboard API
 export const leaderboardApi = {
   get: () => api.get('/leaderboard'),
@@ -114,6 +114,9 @@ export const userApi = {
 export const adminApi = {
   getDashboard: () => api.get('/admin/dashboard'),
   getAnalytics: (eventId) => api.get(`/admin/analytics/${eventId}`),
+  // Leaderboard
+  getLeaderboard: (eventId) => api.get(`/admin/leaderboard/${eventId}`),
+  getLeaderboardProgression: (eventId, limit = 10) => api.get(`/admin/leaderboard/${eventId}/progression`, { params: { limit } }),
   exportLeaderboardPDF: (eventId) => api.get(`/admin/leaderboard/${eventId}/export`, { responseType: 'blob' }),
   
   // Events
@@ -121,6 +124,12 @@ export const adminApi = {
   createEvent: (data) => api.post('/admin/events', data),
   updateEvent: (id, data) => api.put(`/admin/events/${id}`, data),
   deleteEvent: (id) => api.delete(`/admin/events/${id}`),
+  
+  // Categories
+  getCategories: (eventId) => api.get('/admin/categories', { params: { eventId } }),
+  createCategory: (data) => api.post('/admin/categories', data),
+  updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
   
   // Challenges
   getChallenges: (eventId) => api.get('/admin/challenges', { params: { eventId } }),

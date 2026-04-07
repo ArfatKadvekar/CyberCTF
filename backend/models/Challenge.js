@@ -40,8 +40,9 @@ const challengeSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true,
-    enum: ['Web', 'Crypto', 'Forensics', 'OSINT', 'Misc', 'Reverse', 'Pwn']
+    required: true
+    // NOTE: Changed from enum to string to support dynamic categories
+    // Frontend/API validates against available categories per event
   },
   difficulty: {
     type: String,

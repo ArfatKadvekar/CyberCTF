@@ -3,7 +3,7 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
-import { authRoutes, challengeRoutes, leaderboardRoutes, adminRoutes, userRoutes } from './routes/index.js';
+import { authRoutes, challengeRoutes, leaderboardRoutes, adminRoutes, userRoutes, categoryRoutes } from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -57,6 +57,7 @@ app.use('/api/challenges', challengeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
