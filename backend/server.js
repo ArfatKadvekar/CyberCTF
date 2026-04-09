@@ -1,12 +1,23 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { authRoutes, challengeRoutes, leaderboardRoutes, adminRoutes, userRoutes, categoryRoutes } from './routes/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+if (!process.env.MONGODB_URI && !process.env.MONGO_URI) {
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,18 +32,30 @@ const corsOptions = {
   maxAge: 86400 // 24 hours
 };
 
-// Log CORS configuration for debugging
-console.log('[CORS] Configuration:', {
-  allowedOrigin: corsOptions.origin,
-  credentials: corsOptions.credentials,
-  fromEnv: !!process.env.CORS_ORIGIN,
-  nodeEnv: NODE_ENV
-});
+if (NODE_ENV === 'development') {
+  console.log('[CORS] Configuration:', {
+    allowedOrigin: corsOptions.origin,
+    credentials: corsOptions.credentials,
+    fromEnv: !!process.env.CORS_ORIGIN,
+    nodeEnv: NODE_ENV
+  });
+}
 
 // Middleware
 app.use(cors(corsOptions));
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+const apiRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 15000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.originalUrl === '/api/health'
+});
+
+app.use('/api', apiRateLimit);
 
 // Request timeout (15 seconds for general requests)
 app.use((req, res, next) => {
@@ -78,7 +101,9 @@ let server;
 const startServer = async () => {
   try {
     // MongoDB connection with production options
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ctf-platform', {
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/ctf-platform';
+
+    await mongoose.connect(mongoUri, {
       maxPoolSize: 10,
       minPoolSize: 2,
       serverSelectionTimeoutMS: 5000,

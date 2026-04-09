@@ -21,9 +21,29 @@ export const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // Block banned users
-    if (user.status === 'banned') {
-      return res.status(403).json({ message: 'Your account has been banned from this event.' });
+    const now = new Date();
+    const isBanActive = (user.isBanned || user.status === 'banned')
+      && (!user.banExpiresAt || user.banExpiresAt > now);
+
+    // Block banned users before any route-level logic
+    if (isBanActive) {
+      return res.status(403).json({
+        message: 'You are banned',
+        reason: user.banReason || 'Violation of rules',
+        banned: true
+      });
+    }
+
+    // Auto-recover users whose temporary ban has expired.
+    if (!isBanActive && (user.isBanned || user.status === 'banned')) {
+      User.updateOne(
+        { _id: user._id },
+        { $set: { isBanned: false, status: 'active', banReason: '', banExpiresAt: null } }
+      ).catch(() => {});
+      user.isBanned = false;
+      user.status = 'active';
+      user.banReason = '';
+      user.banExpiresAt = null;
     }
 
     // ✓ FIXED: Removed sessionToken validation to allow multiple simultaneous sessions
@@ -62,7 +82,8 @@ export const generateToken = (user) => {
   return jwt.sign(
     { 
       userId: user._id, 
-      role: user.role
+      role: user.role,
+      isBanned: !!user.isBanned
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useSession } from '../../context/SessionContext';
+import { useLeaderboard } from '../../context/LeaderboardContext';
 import { challengesApi } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, CategoryBadge, DifficultyBadge } from '../../components/ui';
 import { ArrowLeft, CheckCircle, Users, Download, ExternalLink, Lightbulb, Lock, AlertCircle, Terminal, Flag, Copy, Check } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useDialog } from '../../context/DialogContext';
 export default function ChallengePage() {
   const { id } = useParams();
   const { updateScore } = useSession();
+  const { refreshLeaderboard } = useLeaderboard();
   
   const [challenge, setChallenge] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +54,7 @@ export default function ChallengePage() {
         updateScore(response.data.newScore);
         setChallenge(prev => ({ ...prev, solved: true }));
         setFlag('');
+        refreshLeaderboard({ force: true }).catch(() => {});
       }
     } catch (error) {
       setResult({
@@ -73,6 +76,7 @@ export default function ChallengePage() {
     try {
       const response = await challengesApi.unlockHint(id, hintIndex);
       updateScore(response.data.newScore);
+      refreshLeaderboard({ force: true }).catch(() => {});
       
       setChallenge(prev => ({
         ...prev,

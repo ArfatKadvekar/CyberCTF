@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { adminApi } from '../../lib/api';
 
@@ -20,11 +20,17 @@ export default function LeaderboardProgressionChart({ eventId }) {
   const [data, setData] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
-    const fetchProgression = async () => {
+    const fetchProgression = async ({ initial = false } = {}) => {
+      if (isFetchingRef.current) return;
+
+      isFetchingRef.current = true;
       try {
-        setLoading(true);
+        if (initial) {
+          setLoading(true);
+        }
         const response = await adminApi.getLeaderboardProgression(eventId, 5); // Top 5 for clarity
         
         // Format Recharts data - convert timestamps to readable format
@@ -51,13 +57,23 @@ export default function LeaderboardProgressionChart({ eventId }) {
       } catch (error) {
         console.error('Error fetching leaderboard progression:', error);
       } finally {
+        isFetchingRef.current = false;
         setLoading(false);
       }
     };
 
     if (eventId) {
-      fetchProgression();
+      fetchProgression({ initial: true });
     }
+
+    const interval = window.setInterval(() => {
+      if (!eventId) return;
+      fetchProgression({ initial: false });
+    }, 8000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
   }, [eventId]);
 
   if (loading) {

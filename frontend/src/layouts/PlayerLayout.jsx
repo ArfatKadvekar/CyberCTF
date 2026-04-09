@@ -124,30 +124,7 @@ export default function PlayerLayout({ children }) {
       {/* Main Content Area (offset by sidebar width) */}
       <div className="flex-1 ml-64 flex flex-col min-h-screen">
         {/* Top Header / Context bar */}
-        <header className="h-16 border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-40 px-8 flex items-center justify-between">
-           <div className="flex items-center gap-6 text-sm">
-             <Link 
-               to="/challenges" 
-               className={cn(
-                 "flex items-center gap-2 transition-colors hover:text-primary",
-                 location.pathname === '/challenges' ? "text-primary font-bold" : "text-muted-foreground"
-               )}
-             >
-               <Flag className={cn("w-4 h-4", location.pathname === '/challenges' ? "text-primary" : "text-primary/70")} />
-               Challenges
-             </Link>
-             <Link 
-               to="/leaderboard" 
-               className={cn(
-                 "flex items-center gap-2 transition-colors hover:text-primary",
-                 location.pathname === '/leaderboard' ? "text-primary font-bold" : "text-muted-foreground"
-               )}
-             >
-               <Trophy className={cn("w-4 h-4", location.pathname === '/leaderboard' ? "text-primary" : "text-primary/70")} />
-               Leaderboard
-             </Link>
-           </div>
-           
+        <header className="h-16 border-b border-border/50 bg-background/95 backdrop-blur-sm sticky top-0 z-40 px-8 flex items-center justify-end">
            <div className="flex items-center gap-6">
              <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground/80">Event:</span>

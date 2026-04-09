@@ -11,6 +11,8 @@ import ActivityChart from '../../components/charts/ActivityChart';
 export default function DashboardPage() {
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newEvent, setNewEvent] = useState({ name: '', description: '' });
@@ -32,6 +34,28 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboard();
   }, []);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (!selectedEventForAnalytics) {
+        setAnalytics(null);
+        return;
+      }
+
+      try {
+        setAnalyticsLoading(true);
+        const response = await adminApi.getAnalytics(selectedEventForAnalytics);
+        setAnalytics(response.data);
+      } catch (error) {
+        console.error('Error fetching analytics:', error);
+        setAnalytics(null);
+      } finally {
+        setAnalyticsLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [selectedEventForAnalytics]);
 
   const handleCreateEvent = async (e) => {
     e.preventDefault();
@@ -328,10 +352,10 @@ export default function DashboardPage() {
           {/* Analytics Charts */}
           {selectedEventForAnalytics ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <CategoryDistributionChart eventId={selectedEventForAnalytics} />
-              <SolveRatesChart eventId={selectedEventForAnalytics} />
+              <CategoryDistributionChart data={analytics?.categoryDistribution || []} loading={analyticsLoading} />
+              <SolveRatesChart data={analytics?.solveRates || []} loading={analyticsLoading} />
               <div className="lg:col-span-2">
-                <ActivityChart eventId={selectedEventForAnalytics} />
+                <ActivityChart data={analytics?.activity || []} loading={analyticsLoading} />
               </div>
             </div>
           ) : (

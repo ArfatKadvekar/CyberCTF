@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSession } from './context/SessionContext';
+import { useBan } from './context/BanContext';
 
 // Layouts
 import PlayerLayout from './layouts/PlayerLayout';
@@ -8,6 +9,7 @@ import AdminLayout from './layouts/AdminLayout';
 // Public pages
 import JoinPage from './pages/JoinPage';
 import AdminLoginPage from './pages/AdminLoginPage';
+import BannedPage from './pages/BannedPage';
 
 // Player pages
 import HomePage from './pages/player/HomePage';
@@ -71,6 +73,20 @@ function PublicRoute({ children }) {
 }
 
 export default function App() {
+  const { isBanned, banReason, clearBanState } = useBan();
+
+  if (isBanned) {
+    return (
+      <BannedPage
+        reason={banReason || 'Violation of rules'}
+        onDismiss={() => {
+          clearBanState();
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
+
   return (
     <Routes>
       {/* Public routes */}
@@ -90,6 +106,8 @@ export default function App() {
           </PublicRoute>
         }
       />
+
+      <Route path="/banned" element={<Navigate to="/" replace />} />
 
       {/* Player routes */}
       <Route

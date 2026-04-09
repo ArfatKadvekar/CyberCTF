@@ -1,9 +1,27 @@
 import express from 'express';
 import PDFDocument from 'pdfkit';
+import bcryptjs from 'bcryptjs';
+import mongoose from 'mongoose';
 import { User, Event, Challenge, Submission, UnlockedHint, Category } from '../models/index.js';
 import { authMiddleware, requireAdmin } from '../middleware/auth.js';
+import { invalidateLeaderboardCache } from '../utils/leaderboardCache.js';
 
 const router = express.Router();
+const { Types } = mongoose;
+
+function toObjectId(id) {
+  if (!Types.ObjectId.isValid(id)) {
+    return null;
+  }
+  return new Types.ObjectId(id);
+}
+
+function sanitizeUser(userDoc) {
+  const user = userDoc?.toObject ? userDoc.toObject() : { ...(userDoc || {}) };
+  delete user.password;
+  delete user.sessionToken;
+  return user;
+}
 
 // All routes require admin auth
 router.use(authMiddleware, requireAdmin);
@@ -214,8 +232,7 @@ router.put('/challenges/:id', async (req, res, next) => {
       flag, flagFormat, attachments, hints, isActive, eventId
     } = req.body;
 
-    // Build update object
-    const updateData = {
+    const setData = {
       title,
       description,
       category,
@@ -227,15 +244,21 @@ router.put('/challenges/:id', async (req, res, next) => {
       isActive,
       eventId
     };
+    const updateData = Object.fromEntries(
+      Object.entries(setData).filter(([, value]) => value !== undefined)
+    );
 
-    // If flag is provided, it will be hashed by pre-save middleware
-    if (flag) {
-      updateData.flag = flag;
+    // findByIdAndUpdate does not run pre-save hooks, so hash manually here.
+    if (typeof flag === 'string' && flag.trim()) {
+      updateData.flagHash = await bcryptjs.hash(flag.trim(), 10);
     }
 
     const challenge = await Challenge.findByIdAndUpdate(
       req.params.id,
-      updateData,
+      {
+        $set: updateData,
+        $unset: { flag: 1 }
+      },
       { new: true, runValidators: true }
     ).select('-flagHash -flag'); // SECURITY: Never expose flag or hash
 
@@ -279,24 +302,35 @@ router.get('/users', async (req, res, next) => {
     if (role) query.role = role;
 
     const users = await User.find(query)
-      .select('-password')
+      .select('-password -sessionToken')
       .populate('eventId', 'name')
       .sort({ score: -1, createdAt: 1 });
 
-    // Get solve counts
-    const usersWithStats = await Promise.all(
-      users.map(async (user) => {
-        const solveCount = await Submission.countDocuments({
-          userId: user._id,
-          isCorrect: true
-        });
-
-        return {
-          ...user.toObject(),
-          solveCount
-        };
-      })
+    const userIds = users.map((user) => user._id);
+    const solveCounts = userIds.length
+      ? await Submission.aggregate([
+          {
+            $match: {
+              userId: { $in: userIds },
+              isCorrect: true
+            }
+          },
+          {
+            $group: {
+              _id: '$userId',
+              solveCount: { $sum: 1 }
+            }
+          }
+        ])
+      : [];
+    const solveCountMap = new Map(
+      solveCounts.map((entry) => [entry._id.toString(), entry.solveCount])
     );
+
+    const usersWithStats = users.map((user) => ({
+      ...user.toObject(),
+      solveCount: solveCountMap.get(user._id.toString()) || 0
+    }));
 
     res.json({ users: usersWithStats });
   } catch (error) {
@@ -307,7 +341,7 @@ router.get('/users', async (req, res, next) => {
 // PUT /api/admin/users/:id/status - Update user status
 router.put('/users/:id/status', async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const { status, reason, banExpiresAt } = req.body;
     
     if (!['active', 'banned'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
@@ -323,13 +357,81 @@ router.put('/users/:id/status', async (req, res, next) => {
     }
 
     user.status = status;
+    if (status === 'banned') {
+      user.isBanned = true;
+      user.banReason = typeof reason === 'string' ? reason.trim() : (user.banReason || 'Violation of rules');
+      user.banExpiresAt = banExpiresAt ? new Date(banExpiresAt) : null;
+    } else {
+      user.isBanned = false;
+      user.banReason = '';
+      user.banExpiresAt = null;
+    }
     // Forcibly clear active sessions if banned
     if (status === 'banned') {
       user.sessionToken = null; 
     }
     
     await user.save();
-    res.json({ message: `User ${status}`, user });
+    res.json({ message: `User ${status}`, user: sanitizeUser(user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/ban/:userId - Ban a player with reason
+router.post('/ban/:userId', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { banReason } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({ message: 'Cannot ban an admin' });
+    }
+
+    user.isBanned = true;
+    user.status = 'banned';
+    user.banReason = typeof banReason === 'string' && banReason.trim()
+      ? banReason.trim()
+      : 'Violation of rules';
+    user.sessionToken = null;
+
+    await user.save();
+
+    return res.json({
+      message: 'User banned successfully',
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/admin/unban/:userId - Unban a player
+router.post('/unban/:userId', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.isBanned = false;
+    user.status = 'active';
+    user.banReason = '';
+    user.banExpiresAt = null;
+
+    await user.save();
+
+    return res.json({
+      message: 'User unbanned successfully',
+      user: sanitizeUser(user)
+    });
   } catch (error) {
     next(error);
   }
@@ -350,6 +452,7 @@ router.post('/users/:id/reset', async (req, res, next) => {
     
     // Also delete any UnlockedHint documents for this user
     await UnlockedHint.deleteMany({ userId: user._id });
+    invalidateLeaderboardCache(user.eventId);
 
     res.json({ message: 'User progress reset successfully' });
   } catch (error) {
@@ -372,6 +475,7 @@ router.delete('/users/:id', async (req, res, next) => {
 
     await User.findByIdAndDelete(req.params.id);
     await Submission.deleteMany({ userId: user._id });
+    invalidateLeaderboardCache(user.eventId);
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -385,16 +489,21 @@ router.delete('/users/:id', async (req, res, next) => {
 router.get('/analytics/:eventId', async (req, res, next) => {
   try {
     const { eventId } = req.params;
+    const eventObjectId = toObjectId(eventId);
+
+    if (!eventObjectId) {
+      return res.status(400).json({ message: 'Invalid event id' });
+    }
 
     // Verify event exists
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventObjectId);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // 1. CATEGORY DISTRIBUTION - Count challenges by category
     const categoryDistribution = await Challenge.aggregate([
-      { $match: { eventId } },
+      { $match: { eventId: eventObjectId } },
       {
         $group: {
           _id: '$category',
@@ -412,19 +521,19 @@ router.get('/analytics/:eventId', async (req, res, next) => {
     ]);
 
     // 2. SOLVE RATES - Count correct submissions per challenge
-    const challenges = await Challenge.find({ eventId }).select('_id title category');
+    const challenges = await Challenge.find({ eventId: eventObjectId }).select('_id title category');
     
     const solveRates = await Promise.all(
       challenges.map(async (challenge) => {
         const totalSubmissions = await Submission.countDocuments({
           challengeId: challenge._id,
-          eventId
+          eventId: eventObjectId
         });
 
         const correctSubmissions = await Submission.countDocuments({
           challengeId: challenge._id,
           isCorrect: true,
-          eventId
+          eventId: eventObjectId
         });
 
         const percent = totalSubmissions > 0 
@@ -444,7 +553,7 @@ router.get('/analytics/:eventId', async (req, res, next) => {
     // 3. ACTIVITY TIMELINE - Submissions over time (hourly)
     const activity = await Submission.aggregate([
       {
-        $match: { eventId }
+        $match: { eventId: eventObjectId }
       },
       {
         $group: {
@@ -482,17 +591,23 @@ router.get('/analytics/:eventId', async (req, res, next) => {
 // GET /api/admin/leaderboard/:eventId/progression - Get score progression for top players over time
 router.get('/leaderboard/:eventId/progression', async (req, res, next) => {
   try {
-    const { eventId, limit = 10 } = req.query;
+    const { eventId } = req.params;
+    const eventObjectId = toObjectId(eventId);
+    const { limit = 10 } = req.query;
     const topN = Math.min(parseInt(limit) || 10, 20); // Cap at 20
 
+    if (!eventObjectId) {
+      return res.status(400).json({ message: 'Invalid event id' });
+    }
+
     // Verify event exists
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventObjectId);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Get top N players
-    const topPlayers = await User.find({ eventId, role: 'player' })
+    const topPlayers = await User.find({ eventId: eventObjectId, role: 'player' })
       .select('_id username score')
       .sort({ score: -1 })
       .limit(topN);
@@ -508,7 +623,7 @@ router.get('/leaderboard/:eventId/progression', async (req, res, next) => {
         const submissions = await Submission.find({
           userId: player._id,
           isCorrect: true,
-          eventId
+          eventId: eventObjectId
         })
           .populate('challengeId', 'points')
           .sort({ createdAt: 1 });
@@ -589,37 +704,54 @@ router.get('/leaderboard/:eventId/progression', async (req, res, next) => {
 router.get('/leaderboard/:eventId', async (req, res, next) => {
   try {
     const { eventId } = req.params;
+    const eventObjectId = toObjectId(eventId);
+
+    if (!eventObjectId) {
+      return res.status(400).json({ message: 'Invalid event id' });
+    }
 
     // Verify event exists
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventObjectId);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Fetch leaderboard for this event
     const players = await User.find({ 
-      eventId, 
+      eventId: eventObjectId,
       role: 'player' 
     })
       .select('username score createdAt')
       .sort({ score: -1, createdAt: 1 });
 
-    // Get solve counts for each player
-    const leaderboard = await Promise.all(
-      players.map(async (player, index) => {
-        const solveCount = await Submission.countDocuments({
-          userId: player._id,
-          isCorrect: true
-        });
-
-        return {
-          rank: index + 1,
-          username: player.username,
-          score: player.score,
-          solveCount
-        };
-      })
+    const playerIds = players.map((player) => player._id);
+    const solveCounts = playerIds.length
+      ? await Submission.aggregate([
+          {
+            $match: {
+              eventId: eventObjectId,
+              isCorrect: true,
+              userId: { $in: playerIds }
+            }
+          },
+          {
+            $group: {
+              _id: '$userId',
+              solveCount: { $sum: 1 }
+            }
+          }
+        ])
+      : [];
+    const solveCountMap = new Map(
+      solveCounts.map((entry) => [entry._id.toString(), entry.solveCount])
     );
+
+    const leaderboard = players.map((player, index) => ({
+      rank: index + 1,
+      username: player.username,
+      score: player.score,
+      solveCount: solveCountMap.get(player._id.toString()) || 0
+    }));
 
     res.json({ event, leaderboard });
   } catch (error) {
@@ -631,16 +763,21 @@ router.get('/leaderboard/:eventId', async (req, res, next) => {
 router.get('/leaderboard/:eventId/export', async (req, res, next) => {
   try {
     const { eventId } = req.params;
+    const eventObjectId = toObjectId(eventId);
+
+    if (!eventObjectId) {
+      return res.status(400).json({ message: 'Invalid event id' });
+    }
 
     // Verify event exists
-    const event = await Event.findById(eventId);
+    const event = await Event.findById(eventObjectId);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     // Fetch leaderboard for this event
     const players = await User.find({ 
-      eventId, 
+      eventId: eventObjectId,
       role: 'player' 
     })
       .select('username score createdAt')
@@ -650,22 +787,34 @@ router.get('/leaderboard/:eventId/export', async (req, res, next) => {
       return res.status(400).json({ message: 'No players found for this event' });
     }
 
-    // Get solve counts for each player
-    const leaderboard = await Promise.all(
-      players.map(async (player, index) => {
-        const solveCount = await Submission.countDocuments({
-          userId: player._id,
-          isCorrect: true
-        });
-
-        return {
-          rank: index + 1,
-          username: player.username,
-          score: player.score,
-          solveCount
-        };
-      })
+    const playerIds = players.map((player) => player._id);
+    const solveCounts = playerIds.length
+      ? await Submission.aggregate([
+          {
+            $match: {
+              eventId: eventObjectId,
+              isCorrect: true,
+              userId: { $in: playerIds }
+            }
+          },
+          {
+            $group: {
+              _id: '$userId',
+              solveCount: { $sum: 1 }
+            }
+          }
+        ])
+      : [];
+    const solveCountMap = new Map(
+      solveCounts.map((entry) => [entry._id.toString(), entry.solveCount])
     );
+
+    const leaderboard = players.map((player, index) => ({
+      rank: index + 1,
+      username: player.username,
+      score: player.score,
+      solveCount: solveCountMap.get(player._id.toString()) || 0
+    }));
 
     // Generate PDF
     const doc = new PDFDocument({

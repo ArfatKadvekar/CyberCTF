@@ -1,5 +1,14 @@
 import axios from 'axios';
 
+let banBlocked = false;
+
+const isAuthPath = (url = '') => url.startsWith('/auth/');
+const isBanResponse = (error) => error?.response?.status === 403 && error?.response?.data?.banned === true;
+
+export const clearBanBlock = () => {
+  banBlocked = false;
+};
+
 // Determine API base URL with smart fallback strategy
 // Priority 1: VITE_API_URL environment variable (set in Vercel dashboard)
 // Priority 2: Production fallback to Render backend
@@ -28,19 +37,24 @@ const api = axios.create({
 
 // Add token to requests
 api.interceptors.request.use((config) => {
+  if (banBlocked && !isAuthPath(config.url || '')) {
+    return Promise.reject({
+      response: {
+        status: 403,
+        data: {
+          message: 'You are banned',
+          reason: 'Violation of rules',
+          banned: true
+        }
+      }
+    });
+  }
+
   const token = localStorage.getItem('ctf_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  
-  // Log request for debugging
-  console.log('[API] Request:', {
-    method: config.method?.toUpperCase(),
-    url: config.url,
-    fullURL: config.baseURL + config.url,
-    hasToken: !!token
-  });
-  
+
   return config;
 });
 
@@ -48,25 +62,19 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Log 404 errors for debugging
-    if (error.response?.status === 404) {
-      console.error('[API] 404 Error - Route not found:', {
-        endpoint: error.config?.url,
-        fullURL: error.config?.baseURL + error.config?.url,
-        status: error.response?.status,
-        message: error.response?.data?.message
-      });
+    // Treat 403 as a ban only when backend explicitly marks it as banned.
+    if (isBanResponse(error)) {
+      const reason = error.response?.data?.reason || error.response?.data?.message || 'Violation of rules';
+
+      banBlocked = true;
+      localStorage.removeItem('ctf_token');
+      localStorage.removeItem('ctf_user');
+
+      window.dispatchEvent(new CustomEvent('ctf:user-banned', {
+        detail: { reason }
+      }));
     }
-    
-    // Log CORS errors
-    if (error.message === 'Network Error' && !error.response) {
-      console.error('[API] Network Error - Possible CORS issue:', {
-        endpoint: error.config?.url,
-        baseURL: error.config?.baseURL,
-        hint: 'Check browser Network tab for CORS errors'
-      });
-    }
-    
+
     // Handle 401 - Unauthorized
     if (error.response?.status === 401) {
       localStorage.removeItem('ctf_token');
@@ -139,6 +147,8 @@ export const adminApi = {
   
   // Users
   getUsers: (eventId, role) => api.get('/admin/users', { params: { eventId, role } }),
+  banUser: (id, banReason) => api.post(`/admin/ban/${id}`, { banReason }),
+  unbanUser: (id) => api.post(`/admin/unban/${id}`),
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   updateUserStatus: (id, status) => api.put(`/admin/users/${id}/status`, { status }),
   resetUser: (id) => api.post(`/admin/users/${id}/reset`)

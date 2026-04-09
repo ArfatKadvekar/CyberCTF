@@ -119,7 +119,7 @@ export default function StreamerModePage() {
           <div>
             <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <MonitorPlay className="w-5 h-5 text-primary" />
-              Top Players
+              Podium
             </h2>
             <TopPlayersCards leaderboard={leaderboard} />
           </div>

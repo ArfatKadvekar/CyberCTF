@@ -1,6 +1,7 @@
 import express from 'express';
 import { Challenge, Submission, UnlockedHint, User } from '../models/index.js';
 import { authMiddleware, requirePlayer } from '../middleware/auth.js';
+import { invalidateLeaderboardCache } from '../utils/leaderboardCache.js';
 
 const router = express.Router();
 
@@ -155,6 +156,7 @@ router.post('/:id/submit', authMiddleware, requirePlayer, async (req, res, next)
 
       // Get updated user
       const updatedUser = await User.findById(userId);
+      invalidateLeaderboardCache(req.user.eventId);
 
       // SECURITY: Response does NOT include flag, hash, or any sensitive info
       return res.json({
@@ -240,6 +242,7 @@ router.post('/:id/hints/:hintIndex/unlock', authMiddleware, requirePlayer, async
     });
 
     const updatedUser = await User.findById(userId);
+    invalidateLeaderboardCache(req.user.eventId);
 
     res.json({
       message: 'Hint unlocked',

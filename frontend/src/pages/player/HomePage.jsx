@@ -1,34 +1,30 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSession } from '../../context/SessionContext';
-import { challengesApi, leaderboardApi } from '../../lib/api';
+import { challengesApi } from '../../lib/api';
+import { useLeaderboard } from '../../context/LeaderboardContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui';
 import { Flag, Trophy, Target, Zap, ArrowRight, CheckCircle, Terminal, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export default function HomePage() {
   const { user, event } = useSession();
-  const [stats, setStats] = useState({ solved: 0, total: 0, rank: '-', totalPlayers: 0 });
+  const { currentUser, totalPlayers, loading: leaderboardLoading } = useLeaderboard();
+  const [stats, setStats] = useState({ solved: 0, total: 0 });
   const [recentChallenges, setRecentChallenges] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [challengesRes, leaderboardRes] = await Promise.all([
-          challengesApi.getAll(),
-          leaderboardApi.get()
-        ]);
+        const challengesRes = await challengesApi.getAll();
 
         const challenges = challengesRes.data.challenges;
         const solvedCount = challenges.filter(c => c.solved).length;
-        const leaderboardData = leaderboardRes.data.leaderboard || [];
         
         setStats({
           solved: solvedCount,
-          total: challenges.length,
-          rank: leaderboardRes.data.currentUser?.rank || '-',
-          totalPlayers: leaderboardData.length
+          total: challenges.length
         });
 
         // Get unsolved challenges for recommendations
@@ -44,7 +40,7 @@ export default function HomePage() {
     fetchData();
   }, []);
 
-  if (loading) {
+  if (loading || leaderboardLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -92,7 +88,7 @@ export default function HomePage() {
             </div>
             <div className="flex flex-col gap-1">
               <p className="text-4xl font-mono font-bold text-primary">{user?.score || 0}</p>
-              <p className="text-sm text-muted-foreground">Rank #{stats.rank}</p>
+              <p className="text-sm text-muted-foreground">Rank #{currentUser?.rank ?? '-'}</p>
             </div>
           </CardContent>
         </Card>
@@ -123,7 +119,7 @@ export default function HomePage() {
               <Users className="w-5 h-5 text-primary" />
             </div>
             <div className="flex flex-col gap-1">
-              <p className="text-4xl font-mono font-bold text-primary">{stats.totalPlayers}</p>
+              <p className="text-4xl font-mono font-bold text-primary">{totalPlayers}</p>
               <p className="text-sm text-muted-foreground">Active competitors</p>
             </div>
           </CardContent>
@@ -160,7 +156,7 @@ export default function HomePage() {
           </CardHeader>
           <CardContent className="flex-1 flex flex-col items-center justify-center min-h-[150px]">
              <div className="py-6 px-12 bg-background/50 border border-border/50 rounded-lg text-sm text-muted-foreground w-full text-center mt-2 mb-8">
-                {stats.totalPlayers === 0 ? 'No players yet' : 'Leaderboard active'}
+               {totalPlayers === 0 ? 'No players yet' : 'Leaderboard active'}
              </div>
              
             <Link to="/leaderboard" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors mt-auto mb-4">

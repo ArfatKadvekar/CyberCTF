@@ -50,19 +50,42 @@ export default function UsersPage() {
   };
 
   const handleStatusUpdate = async (id, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'banned' : 'active';
-    
+    const isCurrentlyBanned = currentStatus === true;
+
+    if (isCurrentlyBanned) {
+      showConfirm({
+        title: 'Unban Player',
+        message: 'Are you sure you want to UNBAN this player?',
+        confirmText: 'Unban Player',
+        variant: 'success',
+        onConfirm: async () => {
+          try {
+            await adminApi.unbanUser(id);
+            fetchData();
+          } catch (error) {
+            showAlert('Error', error.response?.data?.message || 'Error unbanning user', 'destructive');
+          }
+        }
+      });
+      return;
+    }
+
+    const reason = window.prompt('Ban reason', 'Violation of rules');
+    if (reason === null) {
+      return;
+    }
+
     showConfirm({
-      title: `${newStatus === 'banned' ? 'Ban' : 'Unban'} Player`,
-      message: `Are you sure you want to ${newStatus === 'banned' ? 'BAN' : 'UNBAN'} this player?`,
-      confirmText: newStatus === 'banned' ? 'Ban Player' : 'Unban Player',
-      variant: newStatus === 'banned' ? 'destructive' : 'success',
+      title: 'Ban Player',
+      message: 'Are you sure you want to BAN this player?',
+      confirmText: 'Ban Player',
+      variant: 'destructive',
       onConfirm: async () => {
         try {
-          await adminApi.updateUserStatus(id, newStatus);
+          await adminApi.banUser(id, reason.trim() || 'Violation of rules');
           fetchData();
         } catch (error) {
-          showAlert('Error', error.response?.data?.message || 'Error updating status', 'destructive');
+          showAlert('Error', error.response?.data?.message || 'Error banning user', 'destructive');
         }
       }
     });
@@ -160,15 +183,18 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((user) => (
+                  {filteredUsers.map((user) => {
+                    const banned = user.isBanned || user.status === 'banned';
+
+                    return (
                     <tr key={user._id} className="border-b border-border last:border-0 hover:bg-muted/30">
                       <td className="p-4">
-                        <span className={cn("font-mono font-medium", user.status === 'banned' ? 'text-muted-foreground line-through' : 'text-foreground')}>
+                        <span className={cn("font-mono font-medium", banned ? 'text-muted-foreground line-through' : 'text-foreground')}>
                           {user.username}
                         </span>
                       </td>
                       <td className="p-4">
-                        {user.status === 'banned' ? (
+                        {banned ? (
                           <span className="px-2 py-0.5 rounded text-[10px] bg-destructive/20 text-destructive border border-destructive/30 font-medium uppercase tracking-wider">Banned</span>
                         ) : (
                           <span className="px-2 py-0.5 rounded text-[10px] bg-success/20 text-success border border-success/30 font-medium uppercase tracking-wider">Active</span>
@@ -201,11 +227,11 @@ export default function UsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleStatusUpdate(user._id, user.status)}
-                            title={user.status === 'banned' ? 'Unban Player' : 'Ban Player'}
-                            className={user.status === 'banned' ? "text-success hover:text-success hover:bg-success/10" : "text-destructive hover:text-destructive hover:bg-destructive/10"}
+                            onClick={() => handleStatusUpdate(user._id, banned)}
+                            title={banned ? 'Unban Player' : 'Ban Player'}
+                            className={banned ? "text-success hover:text-success hover:bg-success/10" : "text-destructive hover:text-destructive hover:bg-destructive/10"}
                           >
-                            {user.status === 'banned' ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                            {banned ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                           </Button>
                           <Button
                             variant="ghost"
@@ -228,7 +254,8 @@ export default function UsersPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

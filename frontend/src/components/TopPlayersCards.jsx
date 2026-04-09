@@ -1,34 +1,34 @@
-import { Trophy, User, Award } from 'lucide-react';
+import { Crown, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function TopPlayersCards({ leaderboard = [] }) {
   const topThree = leaderboard.slice(0, 3);
 
-  const getMedalStyle = (rank) => {
+  const getPodiumStyle = (rank) => {
     if (rank === 1) {
       return {
-        bg: 'bg-gradient-to-br from-amber-500/15 to-amber-600/5',
-        border: 'border-amber-500/40 hover:border-amber-500/60',
-        icon: 'text-amber-500',
-        accent: 'bg-amber-500/10 border-amber-500/30',
-        medal: '🥇'
+        card: 'bg-gradient-to-br from-amber-500/18 via-amber-500/8 to-background border-amber-400/60 shadow-[0_12px_40px_rgba(245,158,11,0.25)]',
+        ribbon: 'bg-amber-400 text-black',
+        icon: 'text-amber-300',
+        score: 'text-amber-200',
+        offset: '-translate-y-4 md:-translate-y-6 md:scale-[1.03]'
       };
     }
     if (rank === 2) {
       return {
-        bg: 'bg-gradient-to-br from-slate-500/10 to-slate-600/5',
-        border: 'border-slate-400/40 hover:border-slate-400/60',
-        icon: 'text-slate-300',
-        accent: 'bg-slate-500/10 border-slate-400/30',
-        medal: '🥈'
+        card: 'bg-gradient-to-br from-slate-400/14 via-slate-400/6 to-background border-slate-300/45',
+        ribbon: 'bg-slate-300 text-black',
+        icon: 'text-slate-200',
+        score: 'text-slate-100',
+        offset: 'translate-y-0'
       };
     }
     return {
-      bg: 'bg-gradient-to-br from-orange-500/15 to-orange-600/5',
-      border: 'border-orange-500/40 hover:border-orange-500/60',
-      icon: 'text-orange-400',
-      accent: 'bg-orange-500/10 border-orange-500/30',
-      medal: '🥉'
+      card: 'bg-gradient-to-br from-orange-500/14 via-orange-500/6 to-background border-orange-400/40',
+      ribbon: 'bg-orange-400 text-black',
+      icon: 'text-orange-300',
+      score: 'text-orange-200',
+      offset: 'translate-y-0'
     };
   };
 
@@ -41,7 +41,7 @@ export default function TopPlayersCards({ leaderboard = [] }) {
             className="rounded-lg border border-border/20 p-6 bg-card/30 flex items-center justify-center min-h-[220px]"
           >
             <div className="text-center">
-              <Trophy className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+              <Crown className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Rank #{rank} - Awaiting...</p>
             </div>
           </div>
@@ -50,55 +50,49 @@ export default function TopPlayersCards({ leaderboard = [] }) {
     );
   }
 
+  const podium = [topThree[1], topThree[0], topThree[2]].filter(Boolean);
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-      {topThree.map((player, index) => {
-        const rank = index + 1;
-        const style = getMedalStyle(rank);
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full md:items-end">
+      {podium.map((player) => {
+        const rank = player.rank;
+        const style = getPodiumStyle(rank);
+        const initials = (player.username || 'P').slice(0, 2).toUpperCase();
 
         return (
           <div
             key={player.username}
             className={cn(
-              'rounded-lg border-2 p-5 transition-all duration-200 hover:shadow-md backdrop-blur-sm',
-              style.bg,
-              style.border
+              'relative rounded-lg border p-5 md:p-6 transition-all duration-300 backdrop-blur-sm hover:scale-[1.01]',
+              style.card,
+              style.offset
             )}
           >
-            {/* Medal */}
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-border/20">
-              <span className="text-4xl">{style.medal}</span>
-              <span className={cn('px-2.5 py-1 rounded-md text-xs font-bold text-foreground', style.accent)}>
-                Rank #{rank}
-              </span>
+            <div className={cn('absolute left-4 -top-3 px-3 py-1 rounded-sm text-xs font-extrabold', style.ribbon)}>
+              #{rank}
             </div>
 
-            {/* Player Name */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <User className={cn('w-4 h-4 flex-shrink-0', style.icon)} />
-                <p className={cn('font-bold text-lg truncate', style.icon)}>
-                  {player.username}
-                </p>
+            <div className="mt-2 mb-5 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full border border-border/40 bg-background/50 flex items-center justify-center font-mono text-sm font-bold text-foreground">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {rank === 1 ? <Crown className={cn('w-4 h-4', style.icon)} /> : <User className={cn('w-4 h-4', style.icon)} />}
+                  <p className={cn('font-bold text-xl truncate', style.icon)}>{player.username}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">Live rank #{rank}</p>
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="space-y-2">
-              {/* Score */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Score</span>
-                <span className="font-mono font-bold text-lg text-primary">
-                  {player.score}
-                </span>
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border/20">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Score</p>
+                <p className={cn('font-mono text-2xl font-bold mt-1', style.score)}>{player.score}</p>
               </div>
-
-              {/* Solves */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Solved</span>
-                <span className="font-mono font-bold text-lg text-foreground">
-                  {player.solveCount || 0}
-                </span>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Flags</p>
+                <p className="font-mono text-2xl font-bold mt-1 text-foreground">{player.solveCount || 0}</p>
               </div>
             </div>
           </div>

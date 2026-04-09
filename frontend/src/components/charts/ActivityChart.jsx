@@ -3,16 +3,22 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { adminApi } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';
 
-export default function ActivityChart({ eventId }) {
+export default function ActivityChart({ eventId, data: providedData, loading: providedLoading = false }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (providedData !== undefined) {
+      setData(providedData || []);
+      setLoading(false);
+      return;
+    }
+
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
         const response = await adminApi.getAnalytics(eventId);
-        setData(response.data.activity);
+        setData(response.data.activity || []);
       } catch (error) {
         console.error('Error fetching analytics:', error);
       } finally {
@@ -23,9 +29,12 @@ export default function ActivityChart({ eventId }) {
     if (eventId) {
       fetchAnalytics();
     }
-  }, [eventId]);
+  }, [eventId, providedData]);
 
-  if (loading) {
+  const displayData = providedData !== undefined ? providedData : data;
+  const displayLoading = providedData !== undefined ? providedLoading : loading;
+
+  if (displayLoading) {
     return (
       <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardHeader>
@@ -38,7 +47,7 @@ export default function ActivityChart({ eventId }) {
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!displayData || displayData.length === 0) {
     return (
       <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardHeader>
@@ -59,7 +68,7 @@ export default function ActivityChart({ eventId }) {
       </CardHeader>
       <CardContent className="w-full">
         <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+          <LineChart data={displayData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0, 255, 136, 0.1)" />
             <XAxis
               dataKey="time"
@@ -68,7 +77,7 @@ export default function ActivityChart({ eventId }) {
               angle={-45}
               textAnchor="end"
               height={80}
-              interval={Math.max(0, Math.floor(data.length / 6))}
+              interval={Math.max(0, Math.floor(displayData.length / 6))}
             />
             <YAxis
               stroke="#666"
@@ -98,24 +107,23 @@ export default function ActivityChart({ eventId }) {
             />
           </LineChart>
         </ResponsiveContainer>
-        {/* Stats */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">Total Submissions</p>
             <p className="font-mono text-2xl font-bold text-primary">
-              {data.reduce((sum, d) => sum + d.submissions, 0)}
+              {displayData.reduce((sum, d) => sum + d.submissions, 0)}
             </p>
           </div>
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">Peak Hour</p>
             <p className="font-mono text-2xl font-bold text-primary">
-              {Math.max(...data.map(d => d.submissions))} submissions
+              {Math.max(...displayData.map(d => d.submissions))} submissions
             </p>
           </div>
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">Average per Hour</p>
             <p className="font-mono text-2xl font-bold text-primary">
-              {Math.round(data.reduce((sum, d) => sum + d.submissions, 0) / data.length)}
+              {Math.round(displayData.reduce((sum, d) => sum + d.submissions, 0) / displayData.length)}
             </p>
           </div>
         </div>

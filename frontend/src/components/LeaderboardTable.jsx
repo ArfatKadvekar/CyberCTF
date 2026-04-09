@@ -1,4 +1,4 @@
-import { Trophy, Award, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export default function LeaderboardTable({ leaderboard = [] }) {
@@ -7,14 +7,6 @@ export default function LeaderboardTable({ leaderboard = [] }) {
     if (rank === 2) return 'bg-gradient-to-r from-slate-400/8 to-transparent hover:from-slate-400/12 hover:to-transparent border-l-4 border-l-slate-400';
     if (rank === 3) return 'bg-gradient-to-r from-orange-500/10 to-transparent hover:from-orange-500/15 hover:to-transparent border-l-4 border-l-orange-500';
     return 'hover:bg-primary/5 border-l-4 border-l-border/10 transition-colors';
-  };
-
-  const getMedalIcon = (rank) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    if (rank <= 10) return '⭐';
-    return null;
   };
 
   const getRankColor = (rank) => {
@@ -54,7 +46,6 @@ export default function LeaderboardTable({ leaderboard = [] }) {
         ) : (
           leaderboard.map((player) => {
             const rank = player.rank;
-            const medal = getMedalIcon(rank);
 
             return (
               <div
@@ -66,10 +57,9 @@ export default function LeaderboardTable({ leaderboard = [] }) {
               >
                 {/* Rank */}
                 <div className="col-span-1 flex items-center">
-                  <div className="flex items-center gap-2">
-                    {medal && <span className="text-base">{medal}</span>}
+                  <div className="flex items-center">
                     <span className={cn('font-mono text-sm', getRankColor(rank))}>
-                      {rank}
+                      #{rank}
                     </span>
                   </div>
                 </div>

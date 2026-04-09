@@ -1,74 +1,55 @@
 import express from 'express';
-import { User } from '../models/index.js';
+import { User, Submission } from '../models/index.js';
 import { authMiddleware, requirePlayer } from '../middleware/auth.js';
+import { getCurrentUserEntry, getEventLeaderboardSnapshot } from '../utils/leaderboardCache.js';
 
 const router = express.Router();
 
 // GET /api/user/rank - Get current user's rank in their event
 router.get('/rank', authMiddleware, requirePlayer, async (req, res, next) => {
   try {
-    const userId = req.user._id;
-    const eventId = req.user.eventId;
+    const snapshot = await getEventLeaderboardSnapshot(req.user.eventId);
+    const currentUser = getCurrentUserEntry(snapshot, req.user._id);
 
-    // Get current user
-    const currentUser = await User.findById(userId);
     if (!currentUser) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+      const currentUserRecord = await User.findById(req.user._id).select('_id username score createdAt');
 
-    // Use aggregation pipeline for efficient rank calculation
-    const rankResult = await User.aggregate([
-      {
-        $match: {
-          eventId,
-          role: 'player'
-        }
-      },
-      {
-        $sort: { score: -1, createdAt: 1 }
-      },
-      {
-        $group: {
-          _id: null,
-          users: {
-            $push: {
-              userId: '$_id',
-              username: '$username',
-              score: '$score'
-            }
-          },
-          totalPlayers: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          rank: {
-            $add: [
-              {
-                $indexOfArray: [
-                  '$users.userId',
-                  userId
-                ]
-              },
-              1
-            ]
-          },
-          totalPlayers: 1
-        }
+      if (!currentUserRecord) {
+        return res.status(404).json({ message: 'User rank not found' });
       }
-    ]);
 
-    if (!rankResult || rankResult.length === 0) {
-      return res.status(404).json({ message: 'User rank not found' });
+      const rankAbove = await User.countDocuments({
+        eventId: req.user.eventId,
+        role: 'player',
+        $or: [
+          { score: { $gt: currentUserRecord.score } },
+          { score: currentUserRecord.score, createdAt: { $lt: currentUserRecord.createdAt } }
+        ]
+      });
+
+      const solveCount = await Submission.countDocuments({
+        userId: currentUserRecord._id,
+        eventId: req.user.eventId,
+        isCorrect: true
+      });
+
+      return res.json({
+        rank: rankAbove + 1,
+        score: currentUserRecord.score,
+        totalPlayers: snapshot.totalPlayers,
+        username: currentUserRecord.username,
+        cachedAt: snapshot.cachedAt,
+        solveCount
+      });
     }
-
-    const { rank, totalPlayers } = rankResult[0];
 
     res.json({
-      rank,
+      rank: currentUser.rank,
       score: currentUser.score,
-      totalPlayers,
-      username: currentUser.username
+      totalPlayers: snapshot.totalPlayers,
+      username: currentUser.username,
+      cachedAt: snapshot.cachedAt,
+      solveCount: currentUser.solveCount
     });
   } catch (error) {
     next(error);

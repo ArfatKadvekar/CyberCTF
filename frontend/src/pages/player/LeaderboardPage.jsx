@@ -1,50 +1,17 @@
-import { useEffect, useState } from 'react';
-import { leaderboardApi } from '../../lib/api';
+import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Input } from '../../components/ui';
-import { Trophy, Medal, Search, Users } from 'lucide-react';
+import { Trophy, Search, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import LeaderboardHistoryChart from '../../components/charts/LeaderboardHistoryChart';
+import { useLeaderboard } from '../../context/LeaderboardContext';
 
 export default function LeaderboardPage() {
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [totalPlayers, setTotalPlayers] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { leaderboard, currentUser, totalPlayers, loading } = useLeaderboard();
   const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const response = await leaderboardApi.get();
-        setLeaderboard(response.data.leaderboard);
-        setCurrentUser(response.data.currentUser);
-        setTotalPlayers(response.data.totalPlayers);
-      } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeaderboard();
-  }, []);
 
   const filteredLeaderboard = leaderboard.filter((player) =>
     player.username.toLowerCase().includes(search.toLowerCase())
   );
-
-  const getRankIcon = (rank) => {
-    switch (rank) {
-      case 1:
-        return <Medal className="w-6 h-6 text-yellow-500" />;
-      case 2:
-        return <Medal className="w-6 h-6 text-gray-400" />;
-      case 3:
-        return <Medal className="w-6 h-6 text-amber-600" />;
-      default:
-        return <span className="w-6 h-6 flex items-center justify-center font-mono text-muted-foreground">{rank}</span>;
-    }
-  };
 
   if (loading) {
     return (
@@ -76,8 +43,8 @@ export default function LeaderboardPage() {
         <Card className="bg-gradient-to-r from-primary/10 to-transparent border-primary/30">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                {getRankIcon(currentUser.rank)}
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center font-mono text-primary font-bold">
+                #{currentUser.rank}
               </div>
               <div>
                 <p className="font-mono font-semibold text-foreground">{currentUser.username}</p>
@@ -134,9 +101,7 @@ export default function LeaderboardPage() {
                       )}
                     >
                       <td className="p-4">
-                        <div className="flex items-center justify-center">
-                          {getRankIcon(player.rank)}
-                        </div>
+                        <span className="font-mono text-muted-foreground">#{player.rank}</span>
                       </td>
                       <td className="p-4">
                         <span className={cn(

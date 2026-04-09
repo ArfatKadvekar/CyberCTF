@@ -28,8 +28,16 @@ router.post('/join', async (req, res, next) => {
       role: 'player'
     });
 
-    if (player && player.status === 'banned') {
-      return res.status(403).json({ message: 'Your account has been banned from this event.' });
+    const isPlayerBanned = player
+      && (player.isBanned || player.status === 'banned')
+      && (!player.banExpiresAt || player.banExpiresAt > new Date());
+
+    if (isPlayerBanned) {
+      return res.status(403).json({
+        message: 'You are banned',
+        reason: player.banReason || 'Violation of rules',
+        banned: true
+      });
     }
 
     let message = 'Welcome back!';
@@ -84,6 +92,18 @@ router.post('/admin/login', async (req, res, next) => {
     }
 
     const admin = await User.findOne({ username: username.trim(), role: 'admin' });
+    const isAdminBanned = admin
+      && (admin.isBanned || admin.status === 'banned')
+      && (!admin.banExpiresAt || admin.banExpiresAt > new Date());
+
+    if (isAdminBanned) {
+      return res.status(403).json({
+        message: 'You are banned',
+        reason: admin.banReason || 'Violation of rules',
+        banned: true
+      });
+    }
+
 
     if (!admin) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -116,32 +136,36 @@ router.post('/admin/login', async (req, res, next) => {
 });
 
 // GET /api/auth/me - Get current user
-router.get('/me', authMiddleware, async (req, res) => {
-  const user = req.user;
-  
-  let eventData = null;
-  if (user.eventId) {
-    const event = await Event.findById(user.eventId);
-    if (event) {
-      eventData = {
-        id: event._id,
-        name: event.name,
-        description: event.description
-      };
-    }
-  }
+router.get('/me', authMiddleware, async (req, res, next) => {
+  try {
+    const user = req.user;
 
-  res.json({
-    user: {
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      score: user.score,
-      eventId: user.eventId
-    },
-    event: eventData
-  });
+    let eventData = null;
+    if (user.eventId) {
+      const event = await Event.findById(user.eventId);
+      if (event) {
+        eventData = {
+          id: event._id,
+          name: event.name,
+          description: event.description
+        };
+      }
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        score: user.score,
+        eventId: user.eventId
+      },
+      event: eventData
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // POST /api/auth/validate-pin - Validate game PIN (public)

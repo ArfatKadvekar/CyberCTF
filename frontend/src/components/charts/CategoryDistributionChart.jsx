@@ -18,12 +18,18 @@ const FALLBACK_COLORS = [
   '#06b6d4', // Teal
 ];
 
-export default function CategoryDistributionChart({ eventId }) {
+export default function CategoryDistributionChart({ eventId, data: providedData, loading: providedLoading = false }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const { getColorForCategory } = useCategories();
 
   useEffect(() => {
+    if (providedData !== undefined) {
+      setData(providedData || []);
+      setLoading(false);
+      return;
+    }
+
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
@@ -40,9 +46,12 @@ export default function CategoryDistributionChart({ eventId }) {
     if (eventId) {
       fetchAnalytics();
     }
-  }, [eventId]);
+  }, [eventId, providedData]);
 
-  if (loading) {
+  const displayData = providedData !== undefined ? providedData : data;
+  const displayLoading = providedData !== undefined ? providedLoading : loading;
+
+  if (displayLoading) {
     return (
       <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardHeader>
@@ -55,7 +64,7 @@ export default function CategoryDistributionChart({ eventId }) {
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!displayData || displayData.length === 0) {
     return (
       <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardHeader>
@@ -88,7 +97,7 @@ export default function CategoryDistributionChart({ eventId }) {
         <ResponsiveContainer width="100%" height={350}>
           <PieChart>
             <Pie
-              data={data}
+              data={displayData}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -97,7 +106,7 @@ export default function CategoryDistributionChart({ eventId }) {
               fill="#8884d8"
               dataKey="count"
             >
-              {data.map((entry, index) => (
+              {displayData.map((entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 
                   fill={getColor(entry.category, index)} 

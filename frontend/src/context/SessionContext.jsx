@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../lib/api';
+import { clearBanBlock } from '../lib/api';
 
 const SessionContext = createContext(null);
 
@@ -15,6 +16,8 @@ export function SessionProvider({ children }) {
       if (token) {
         try {
           const response = await authApi.getMe();
+          clearBanBlock();
+          window.dispatchEvent(new CustomEvent('ctf:user-unbanned'));
           setUser(response.data.user);
           setEvent(response.data.event);
         } catch (error) {
@@ -28,11 +31,22 @@ export function SessionProvider({ children }) {
     };
 
     initSession();
+
+    const onUserBanned = () => {
+      setUser(null);
+      setEvent(null);
+      setLoading(false);
+    };
+
+    window.addEventListener('ctf:user-banned', onUserBanned);
+    return () => window.removeEventListener('ctf:user-banned', onUserBanned);
   }, []);
 
   const login = (userData, eventData, token) => {
     localStorage.setItem('ctf_token', token);
     localStorage.setItem('ctf_user', JSON.stringify(userData));
+    clearBanBlock();
+    window.dispatchEvent(new CustomEvent('ctf:user-unbanned'));
     setUser(userData);
     setEvent(eventData);
   };

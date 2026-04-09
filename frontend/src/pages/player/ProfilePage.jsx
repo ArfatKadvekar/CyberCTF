@@ -1,29 +1,27 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../../context/SessionContext';
-import { challengesApi, leaderboardApi } from '../../lib/api';
+import { challengesApi } from '../../lib/api';
+import { useLeaderboard } from '../../context/LeaderboardContext';
 import { Card, CardHeader, CardTitle, CardContent, CategoryBadge, DifficultyBadge } from '../../components/ui';
 import { User, Trophy, Flag, Target, Clock, CheckCircle } from 'lucide-react';
 import { formatDate, cn } from '../../lib/utils';
 
 export default function ProfilePage() {
   const { user, event } = useSession();
-  const [stats, setStats] = useState({ rank: '-', solveCount: 0, totalChallenges: 0 });
+  const { currentUser, loading: leaderboardLoading } = useLeaderboard();
+  const [stats, setStats] = useState({ solveCount: 0, totalChallenges: 0 });
   const [solvedChallenges, setSolvedChallenges] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [challengesRes, leaderboardRes] = await Promise.all([
-          challengesApi.getAll(),
-          leaderboardApi.get()
-        ]);
+        const challengesRes = await challengesApi.getAll();
 
         const challenges = challengesRes.data.challenges;
         const solved = challenges.filter(c => c.solved);
 
         setStats({
-          rank: leaderboardRes.data.currentUser?.rank || '-',
           solveCount: solved.length,
           totalChallenges: challenges.length
         });
@@ -45,7 +43,7 @@ export default function ProfilePage() {
     return acc;
   }, {});
 
-  if (loading) {
+  if (loading || leaderboardLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -87,7 +85,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Rank</p>
-              <p className="text-2xl font-mono font-bold text-foreground">#{stats.rank}</p>
+              <p className="text-2xl font-mono font-bold text-foreground">#{currentUser?.rank ?? '-'}</p>
             </div>
           </CardContent>
         </Card>

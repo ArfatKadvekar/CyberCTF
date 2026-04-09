@@ -31,6 +31,8 @@ const submissionSchema = new mongoose.Schema({
 
 // Compound index to quickly check if user has solved a challenge
 submissionSchema.index({ userId: 1, challengeId: 1, isCorrect: 1 });
+submissionSchema.index({ eventId: 1, userId: 1, isCorrect: 1 });
+submissionSchema.index({ eventId: 1, challengeId: 1, isCorrect: 1 });
 
 const Submission = mongoose.model('Submission', submissionSchema);
 

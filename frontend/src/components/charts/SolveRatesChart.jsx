@@ -3,16 +3,22 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { adminApi } from '../../lib/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';
 
-export default function SolveRatesChart({ eventId }) {
+export default function SolveRatesChart({ eventId, data: providedData, loading: providedLoading = false }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (providedData !== undefined) {
+      setData(providedData || []);
+      setLoading(false);
+      return;
+    }
+
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
         const response = await adminApi.getAnalytics(eventId);
-        setData(response.data.solveRates);
+        setData(response.data.solveRates || []);
       } catch (error) {
         console.error('Error fetching analytics:', error);
       } finally {
@@ -23,9 +29,12 @@ export default function SolveRatesChart({ eventId }) {
     if (eventId) {
       fetchAnalytics();
     }
-  }, [eventId]);
+  }, [eventId, providedData]);
 
-  if (loading) {
+  const displayData = providedData !== undefined ? providedData : data;
+  const displayLoading = providedData !== undefined ? providedLoading : loading;
+
+  if (displayLoading) {
     return (
       <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardHeader>
@@ -38,7 +47,7 @@ export default function SolveRatesChart({ eventId }) {
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!displayData || displayData.length === 0) {
     return (
       <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
         <CardHeader>
@@ -51,8 +60,7 @@ export default function SolveRatesChart({ eventId }) {
     );
   }
 
-  // Sort by solve rate ascending for better visualization
-  const sortedData = [...data].sort((a, b) => a.percent - b.percent);
+  const sortedData = [...displayData].sort((a, b) => a.percent - b.percent);
 
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5">
@@ -99,22 +107,21 @@ export default function SolveRatesChart({ eventId }) {
             />
           </BarChart>
         </ResponsiveContainer>
-        {/* Stats breakdown */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">Total Challenges</p>
-            <p className="font-mono text-2xl font-bold text-primary">{data.length}</p>
+            <p className="font-mono text-2xl font-bold text-primary">{displayData.length}</p>
           </div>
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">Average Solve Rate</p>
             <p className="font-mono text-2xl font-bold text-primary">
-              {Math.round(data.reduce((sum, d) => sum + d.percent, 0) / data.length)}%
+              {Math.round(displayData.reduce((sum, d) => sum + d.percent, 0) / displayData.length)}%
             </p>
           </div>
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-sm text-muted-foreground">Total Solves</p>
             <p className="font-mono text-2xl font-bold text-primary">
-              {data.reduce((sum, d) => sum + d.solves, 0)}
+              {displayData.reduce((sum, d) => sum + d.solves, 0)}
             </p>
           </div>
         </div>

@@ -39,6 +39,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'banned'],
     default: 'active'
+  },
+  isBanned: {
+    type: Boolean,
+    default: false
+  },
+  banReason: {
+    type: String,
+    default: ''
+  },
+  banExpiresAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true
@@ -58,6 +70,8 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+userSchema.index({ eventId: 1, role: 1, score: -1, createdAt: 1 });
 
 const User = mongoose.model('User', userSchema);
 

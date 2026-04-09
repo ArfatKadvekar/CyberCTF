@@ -1,6 +1,7 @@
 import express from 'express';
-import { User, Submission, Challenge } from '../models/index.js';
+import { User, Submission } from '../models/index.js';
 import { authMiddleware, requirePlayer } from '../middleware/auth.js';
+import { getCurrentUserEntry, getEventLeaderboardSnapshot } from '../utils/leaderboardCache.js';
 
 const router = express.Router();
 
@@ -8,59 +9,42 @@ const router = express.Router();
 router.get('/', authMiddleware, requirePlayer, async (req, res, next) => {
   try {
     const { eventId } = req.user;
+    const snapshot = await getEventLeaderboardSnapshot(eventId);
 
-    // Get all players in event sorted by score (desc) then by join date (asc)
-    const players = await User.find({ 
-      eventId, 
-      role: 'player' 
-    })
-      .select('username score createdAt')
-      .sort({ score: -1, createdAt: 1 })
-      .limit(100);
+    const leaderboard = snapshot.leaderboard.slice(0, 100).map((player) => ({
+      ...player,
+      isCurrentUser: player.id.toString() === req.user._id.toString()
+    }));
 
-    // Get solve counts for each player
-    const leaderboard = await Promise.all(
-      players.map(async (player, index) => {
-        const solveCount = await Submission.countDocuments({
-          userId: player._id,
-          isCorrect: true
-        });
+    let currentUserRank = getCurrentUserEntry(snapshot, req.user._id);
 
-        return {
-          rank: index + 1,
-          id: player._id,
-          username: player.username,
-          score: player.score,
-          solveCount,
-          isCurrentUser: player._id.toString() === req.user._id.toString()
-        };
-      })
-    );
-
-    // Find current user's rank if not in top 100
-    let currentUserRank = leaderboard.find(p => p.isCurrentUser);
-    
     if (!currentUserRank) {
-      const user = await User.findById(req.user._id);
+      const currentUser = await User.findById(req.user._id).select('_id username score createdAt');
+
+      if (!currentUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
       const rankAbove = await User.countDocuments({
         eventId,
         role: 'player',
         $or: [
-          { score: { $gt: user.score } },
-          { score: user.score, createdAt: { $lt: user.createdAt } }
+          { score: { $gt: currentUser.score } },
+          { score: currentUser.score, createdAt: { $lt: currentUser.createdAt } }
         ]
       });
 
       const solveCount = await Submission.countDocuments({
-        userId: user._id,
+        userId: currentUser._id,
+        eventId,
         isCorrect: true
       });
 
       currentUserRank = {
         rank: rankAbove + 1,
-        id: user._id,
-        username: user.username,
-        score: user.score,
+        id: currentUser._id.toString(),
+        username: currentUser.username,
+        score: currentUser.score,
         solveCount,
         isCurrentUser: true
       };
@@ -69,7 +53,8 @@ router.get('/', authMiddleware, requirePlayer, async (req, res, next) => {
     res.json({
       leaderboard,
       currentUser: currentUserRank,
-      totalPlayers: await User.countDocuments({ eventId, role: 'player' })
+      totalPlayers: snapshot.totalPlayers,
+      cachedAt: snapshot.cachedAt
     });
   } catch (error) {
     next(error);
