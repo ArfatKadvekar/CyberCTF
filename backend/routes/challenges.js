@@ -10,20 +10,23 @@ router.get('/', authMiddleware, requirePlayer, async (req, res, next) => {
   try {
     const { eventId } = req.user;
 
-    const challenges = await Challenge.find({ eventId, isActive: true })
-      .select('-flag')
-      .sort({ category: 1, points: 1 });
+    const [challenges, solvedSubmissions, unlockedHints] = await Promise.all([
+      Challenge.find({ eventId, isActive: true })
+        .select('-flag')
+        .sort({ category: 1, points: 1 })
+        .lean(),
+      Submission.find({
+        userId: req.user._id,
+        isCorrect: true,
+        eventId
+      }).select('challengeId').lean(),
+      UnlockedHint.find({ userId: req.user._id }).select('challengeId hintIndex').lean()
+    ]);
 
     // Get user's solved challenges
-    const solvedSubmissions = await Submission.find({
-      userId: req.user._id,
-      isCorrect: true
-    }).select('challengeId');
-
-    const solvedIds = solvedSubmissions.map(s => s.challengeId.toString());
+    const solvedIds = new Set(solvedSubmissions.map((s) => s.challengeId.toString()));
 
     // Get user's unlocked hints
-    const unlockedHints = await UnlockedHint.find({ userId: req.user._id });
     const unlockedHintsMap = {};
     unlockedHints.forEach(h => {
       if (!unlockedHintsMap[h.challengeId]) {
@@ -34,8 +37,8 @@ router.get('/', authMiddleware, requirePlayer, async (req, res, next) => {
 
     // Map challenges with solved status and hints
     const challengesWithStatus = challenges.map(challenge => {
-      const challengeObj = challenge.toObject();
-      challengeObj.solved = solvedIds.includes(challenge._id.toString());
+      const challengeObj = { ...challenge };
+      challengeObj.solved = solvedIds.has(challenge._id.toString());
       
       // Only show unlocked hints content
       const unlockedForChallenge = unlockedHintsMap[challenge._id.toString()] || [];
@@ -62,27 +65,27 @@ router.get('/:id', authMiddleware, requirePlayer, async (req, res, next) => {
       _id: req.params.id,
       eventId: req.user.eventId,
       isActive: true
-    }).select('-flag');
+    }).select('-flag').lean();
 
     if (!challenge) {
       return res.status(404).json({ message: 'Challenge not found' });
     }
 
     // Check if solved
-    const solved = await Submission.findOne({
-      userId: req.user._id,
-      challengeId: challenge._id,
-      isCorrect: true
-    });
-
-    // Get unlocked hints
-    const unlockedHints = await UnlockedHint.find({
-      userId: req.user._id,
-      challengeId: challenge._id
-    });
+    const [solved, unlockedHints] = await Promise.all([
+      Submission.findOne({
+        userId: req.user._id,
+        challengeId: challenge._id,
+        isCorrect: true
+      }).select('_id').lean(),
+      UnlockedHint.find({
+        userId: req.user._id,
+        challengeId: challenge._id
+      }).select('hintIndex').lean()
+    ]);
     const unlockedIndices = unlockedHints.map(h => h.hintIndex);
 
-    const challengeObj = challenge.toObject();
+    const challengeObj = { ...challenge };
     challengeObj.solved = !!solved;
     challengeObj.hints = challenge.hints.map((hint, index) => ({
       index,
@@ -145,17 +148,15 @@ router.post('/:id/submit', authMiddleware, requirePlayer, async (req, res, next)
 
     if (isCorrect) {
       // Update user score
-      await User.findByIdAndUpdate(userId, {
+      const updatedUser = await User.findByIdAndUpdate(userId, {
         $inc: { score: challenge.points }
-      });
+      }, { new: true }).select('score');
 
       // Increment solve count
       await Challenge.findByIdAndUpdate(challengeId, {
         $inc: { solveCount: 1 }
       });
 
-      // Get updated user
-      const updatedUser = await User.findById(userId);
       invalidateLeaderboardCache(req.user.eventId);
 
       // SECURITY: Response does NOT include flag, hash, or any sensitive info
@@ -188,7 +189,7 @@ router.post('/:id/hints/:hintIndex/unlock', authMiddleware, requirePlayer, async
       _id: challengeId,
       eventId: req.user.eventId,
       isActive: true
-    });
+    }).select('hints isActive eventId').lean();
 
     if (!challenge) {
       return res.status(404).json({ message: 'Challenge not found' });
@@ -224,15 +225,15 @@ router.post('/:id/hints/:hintIndex/unlock', authMiddleware, requirePlayer, async
     const cost = hint.cost;
 
     // Check if user has enough points
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select('score').lean();
     if (user.score < cost) {
       return res.status(400).json({ message: 'Not enough points to unlock this hint' });
     }
 
     // Deduct points and unlock hint
-    await User.findByIdAndUpdate(userId, {
+    const updatedUser = await User.findByIdAndUpdate(userId, {
       $inc: { score: -cost }
-    });
+    }, { new: true }).select('score');
 
     await UnlockedHint.create({
       userId,
@@ -241,7 +242,6 @@ router.post('/:id/hints/:hintIndex/unlock', authMiddleware, requirePlayer, async
       cost
     });
 
-    const updatedUser = await User.findById(userId);
     invalidateLeaderboardCache(req.user.eventId);
 
     res.json({

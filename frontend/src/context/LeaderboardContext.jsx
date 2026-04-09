@@ -5,10 +5,9 @@ import { useSession } from './SessionContext';
 const LeaderboardContext = createContext(null);
 
 const CACHE_KEY = 'ctf_leaderboard_cache_v1';
-const LOCK_KEY = 'ctf_leaderboard_lock_v1';
 const CHANNEL_NAME = 'ctf_leaderboard_channel_v1';
 const CACHE_TTL_MS = 25000;
-const POLL_INTERVAL_MS = 25000;
+const POLL_INTERVAL_MS = 45000;
 const MAX_RETRY_DELAY_MS = 120000;
 const BASE_RETRY_DELAY_MS = 5000;
 
@@ -54,36 +53,6 @@ function writeCachedLeaderboard(payload) {
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
   } catch {
     // Ignore storage errors and keep the in-memory state.
-  }
-}
-
-function readLock(eventId) {
-  const lock = readRaw(LOCK_KEY);
-  if (!lock || lock.eventId !== eventId) return null;
-  if (!lock.expiresAt || lock.expiresAt <= Date.now()) return null;
-  return lock;
-}
-
-function writeLock(eventId, ownerId, ttlMs = 5000) {
-  try {
-    localStorage.setItem(LOCK_KEY, JSON.stringify({
-      eventId,
-      ownerId,
-      expiresAt: Date.now() + ttlMs
-    }));
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-function clearLock(ownerId) {
-  const lock = readRaw(LOCK_KEY);
-  if (!lock || lock.ownerId !== ownerId) return;
-
-  try {
-    localStorage.removeItem(LOCK_KEY);
-  } catch {
-    // Ignore storage errors.
   }
 }
 
@@ -150,17 +119,6 @@ export function LeaderboardProvider({ children }) {
       return inFlightRef.current;
     }
 
-    const lock = readLock(eventId);
-    if (!force && lock && lock.ownerId !== tabIdRef.current) {
-      if (cached) {
-        applyPayload(cached);
-        return cached;
-      }
-
-      return null;
-    }
-
-    writeLock(eventId, tabIdRef.current);
     isFetchingRef.current = true;
     debugLog('Fetching leaderboard...', { eventId, force });
 
@@ -227,7 +185,6 @@ export function LeaderboardProvider({ children }) {
       .finally(() => {
         isFetchingRef.current = false;
         inFlightRef.current = null;
-        clearLock(tabIdRef.current);
       });
 
     inFlightRef.current = request;

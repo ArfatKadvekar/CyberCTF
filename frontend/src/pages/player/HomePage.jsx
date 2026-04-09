@@ -40,7 +40,7 @@ export default function HomePage() {
     fetchData();
   }, []);
 
-  if (loading || leaderboardLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -88,7 +88,9 @@ export default function HomePage() {
             </div>
             <div className="flex flex-col gap-1">
               <p className="text-4xl font-mono font-bold text-primary">{user?.score || 0}</p>
-              <p className="text-sm text-muted-foreground">Rank #{currentUser?.rank ?? '-'}</p>
+              <p className="text-sm text-muted-foreground">
+                {leaderboardLoading ? 'Loading rank...' : `Rank #${currentUser?.rank ?? '-'}`}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -120,7 +122,9 @@ export default function HomePage() {
             </div>
             <div className="flex flex-col gap-1">
               <p className="text-4xl font-mono font-bold text-primary">{totalPlayers}</p>
-              <p className="text-sm text-muted-foreground">Active competitors</p>
+              <p className="text-sm text-muted-foreground">
+                {leaderboardLoading ? 'Refreshing leaderboard...' : 'Active competitors'}
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -31,29 +31,38 @@ router.use(authMiddleware, requireAdmin);
 // GET /api/admin/dashboard - Get dashboard stats
 router.get('/dashboard', async (req, res, next) => {
   try {
-    const events = await Event.find().sort({ createdAt: -1 });
-    
-    const stats = await Promise.all(
-      events.map(async (event) => {
-        const playerCount = await User.countDocuments({ eventId: event._id, role: 'player' });
-        const challengeCount = await Challenge.countDocuments({ eventId: event._id });
-        const submissionCount = await Submission.countDocuments({ eventId: event._id, isCorrect: true });
+    const [events, playerCounts, challengeCounts, submissionCounts] = await Promise.all([
+      Event.find().sort({ createdAt: -1 }).select('_id name gamePin isActive startDate endDate').lean(),
+      User.aggregate([
+        { $match: { role: 'player' } },
+        { $group: { _id: '$eventId', playerCount: { $sum: 1 } } }
+      ]),
+      Challenge.aggregate([
+        { $group: { _id: '$eventId', challengeCount: { $sum: 1 } } }
+      ]),
+      Submission.aggregate([
+        { $match: { isCorrect: true } },
+        { $group: { _id: '$eventId', submissionCount: { $sum: 1 } } }
+      ])
+    ]);
 
-        return {
-          event: {
-            id: event._id,
-            name: event.name,
-            gamePin: event.gamePin,
-            isActive: event.isActive,
-            startDate: event.startDate,
-            endDate: event.endDate
-          },
-          playerCount,
-          challengeCount,
-          submissionCount
-        };
-      })
-    );
+    const playerCountMap = new Map(playerCounts.map((entry) => [entry._id?.toString?.() || String(entry._id), entry.playerCount]));
+    const challengeCountMap = new Map(challengeCounts.map((entry) => [entry._id?.toString?.() || String(entry._id), entry.challengeCount]));
+    const submissionCountMap = new Map(submissionCounts.map((entry) => [entry._id?.toString?.() || String(entry._id), entry.submissionCount]));
+
+    const stats = events.map((event) => ({
+      event: {
+        id: event._id,
+        name: event.name,
+        gamePin: event.gamePin,
+        isActive: event.isActive,
+        startDate: event.startDate,
+        endDate: event.endDate
+      },
+      playerCount: playerCountMap.get(event._id.toString()) || 0,
+      challengeCount: challengeCountMap.get(event._id.toString()) || 0,
+      submissionCount: submissionCountMap.get(event._id.toString()) || 0
+    }));
 
     res.json({ stats });
   } catch (error) {

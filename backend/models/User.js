@@ -72,6 +72,8 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 userSchema.index({ eventId: 1, role: 1, score: -1, createdAt: 1 });
+userSchema.index({ username: 1, role: 1 });
+userSchema.index({ eventId: 1, role: 1, username: 1 });
 
 const User = mongoose.model('User', userSchema);
 

@@ -19,26 +19,27 @@ router.get('/', authMiddleware, requirePlayer, async (req, res, next) => {
     let currentUserRank = getCurrentUserEntry(snapshot, req.user._id);
 
     if (!currentUserRank) {
-      const currentUser = await User.findById(req.user._id).select('_id username score createdAt');
+      const currentUser = await User.findById(req.user._id).select('_id username score createdAt').lean();
 
       if (!currentUser) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      const rankAbove = await User.countDocuments({
-        eventId,
-        role: 'player',
-        $or: [
-          { score: { $gt: currentUser.score } },
-          { score: currentUser.score, createdAt: { $lt: currentUser.createdAt } }
-        ]
-      });
-
-      const solveCount = await Submission.countDocuments({
-        userId: currentUser._id,
-        eventId,
-        isCorrect: true
-      });
+      const [rankAbove, solveCount] = await Promise.all([
+        User.countDocuments({
+          eventId,
+          role: 'player',
+          $or: [
+            { score: { $gt: currentUser.score } },
+            { score: currentUser.score, createdAt: { $lt: currentUser.createdAt } }
+          ]
+        }),
+        Submission.countDocuments({
+          userId: currentUser._id,
+          eventId,
+          isCorrect: true
+        })
+      ]);
 
       currentUserRank = {
         rank: rankAbove + 1,

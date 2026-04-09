@@ -4,6 +4,7 @@ import compression from 'compression';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import { performance } from 'perf_hooks';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -43,9 +44,23 @@ if (NODE_ENV === 'development') {
 
 // Middleware
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+app.use((req, res, next) => {
+  const start = performance.now();
+
+  res.on('finish', () => {
+    const durationMs = performance.now() - start;
+    if (NODE_ENV === 'development' || durationMs >= 500) {
+      console.log(`[PERF] ${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs.toFixed(0)}ms`);
+    }
+  });
+
+  next();
+});
 
 const apiRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,

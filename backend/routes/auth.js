@@ -9,13 +9,17 @@ const router = express.Router();
 router.post('/join', async (req, res, next) => {
   try {
     const { username, gamePin } = req.body;
+    const trimmedUsername = typeof username === 'string' ? username.trim() : '';
+    const normalizedPin = typeof gamePin === 'string' ? gamePin.trim().toUpperCase() : '';
 
-    if (!username || !gamePin) {
+    if (!trimmedUsername || !normalizedPin) {
       return res.status(400).json({ message: 'Username and game PIN are required' });
     }
 
     // Find the event by PIN
-    const event = await Event.findOne({ gamePin, isActive: true });
+    const event = await Event.findOne({ gamePin: normalizedPin, isActive: true })
+      .select('_id name description')
+      .lean();
     
     if (!event) {
       return res.status(404).json({ message: 'Invalid game PIN or event not active' });
@@ -23,10 +27,12 @@ router.post('/join', async (req, res, next) => {
 
     // Check if username already exists in this event
     let player = await User.findOne({ 
-      username: username.trim(), 
+      username: trimmedUsername,
       eventId: event._id,
       role: 'player'
-    });
+    })
+      .select('_id username role score eventId isBanned status banReason banExpiresAt createdAt')
+      .lean();
 
     const isPlayerBanned = player
       && (player.isBanned || player.status === 'banned')
@@ -46,7 +52,7 @@ router.post('/join', async (req, res, next) => {
     // If no existing user, create a new one (Join Flow)
     if (!player) {
       player = await User.create({
-        username: username.trim(),
+        username: trimmedUsername,
         role: 'player',
         eventId: event._id,
         score: 0
@@ -91,7 +97,7 @@ router.post('/admin/login', async (req, res, next) => {
       return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    const admin = await User.findOne({ username: username.trim(), role: 'admin' });
+    const admin = await User.findOne({ username: username.trim(), role: 'admin' }).select('_id username email password role isBanned status banReason banExpiresAt');
     const isAdminBanned = admin
       && (admin.isBanned || admin.status === 'banned')
       && (!admin.banExpiresAt || admin.banExpiresAt > new Date());
@@ -142,7 +148,7 @@ router.get('/me', authMiddleware, async (req, res, next) => {
 
     let eventData = null;
     if (user.eventId) {
-      const event = await Event.findById(user.eventId);
+      const event = await Event.findById(user.eventId).select('_id name description').lean();
       if (event) {
         eventData = {
           id: event._id,

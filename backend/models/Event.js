@@ -74,6 +74,8 @@ eventSchema.statics.generatePin = async function() {
   return pin;
 };
 
+eventSchema.index({ isActive: 1, gamePin: 1 });
+
 const Event = mongoose.model('Event', eventSchema);
 
 export default Event;

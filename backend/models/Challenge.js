@@ -86,6 +86,9 @@ const challengeSchema = new mongoose.Schema({
   timestamps: true
 });
 
+challengeSchema.index({ eventId: 1, isActive: 1, category: 1, points: 1 });
+challengeSchema.index({ eventId: 1, isActive: 1, solveCount: -1 });
+
 // Pre-save middleware: Hash the flag before storing
 challengeSchema.pre('save', async function(next) {
   try {
