@@ -223,7 +223,7 @@ export default function ChallengePage() {
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-2">
                     <Input
-                      placeholder="CTF{enter_your_flag_here}"
+                      placeholder={challenge.flagFormat || 'CTF{enter_your_flag_here}'}
                       value={flag}
                       onChange={(e) => setFlag(e.target.value)}
                       className="font-mono text-lg py-6 bg-black text-primary border-primary/30 focus-visible:ring-primary/50 focus-visible:border-primary shadow-inner placeholder:text-primary/30"
