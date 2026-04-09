@@ -49,6 +49,7 @@ export function SessionProvider({ children }) {
     window.dispatchEvent(new CustomEvent('ctf:user-unbanned'));
     setUser(userData);
     setEvent(eventData);
+    setLoading(false);
   };
 
   const logout = () => {
