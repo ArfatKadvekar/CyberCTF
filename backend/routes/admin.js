@@ -8,6 +8,7 @@ import { invalidateLeaderboardCache } from '../utils/leaderboardCache.js';
 
 const router = express.Router();
 const { Types } = mongoose;
+const PLAYER_STARTING_SCORE = 150;
 
 function toObjectId(id) {
   if (!Types.ObjectId.isValid(id)) {
@@ -638,7 +639,7 @@ router.get('/leaderboard/:eventId/progression', async (req, res, next) => {
           .sort({ createdAt: 1 });
 
         // Calculate cumulative score over time
-        let cumulativeScore = 0;
+        let cumulativeScore = PLAYER_STARTING_SCORE;
         const timelinePoints = submissions.map((sub) => {
           cumulativeScore += sub.challengeId?.points || 0;
           return {
@@ -651,7 +652,7 @@ router.get('/leaderboard/:eventId/progression', async (req, res, next) => {
         if (timelinePoints.length === 0) {
           timelinePoints.push({
             time: player.createdAt || new Date(),
-            score: 0
+            score: PLAYER_STARTING_SCORE
           });
         }
 
@@ -683,7 +684,7 @@ router.get('/leaderboard/:eventId/progression', async (req, res, next) => {
       
       progressionData.forEach(playerData => {
         // Find the score at or before this timestamp
-        let score = 0;
+        let score = PLAYER_STARTING_SCORE;
         for (let i = playerData.timeline.length - 1; i >= 0; i--) {
           if (new Date(playerData.timeline[i].time) <= new Date(timestamp)) {
             score = playerData.timeline[i].score;

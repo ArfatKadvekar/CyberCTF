@@ -3,6 +3,7 @@ import { User, Event } from '../models/index.js';
 import { generateToken, authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
+const PLAYER_STARTING_SCORE = 150;
 
 // POST /api/auth/join - Player joins event with username + PIN
 // ✓ FIXED: Removed sessionToken assignment to allow multiple simultaneous sessions
@@ -55,7 +56,7 @@ router.post('/join', async (req, res, next) => {
         username: trimmedUsername,
         role: 'player',
         eventId: event._id,
-        score: 0
+        score: PLAYER_STARTING_SCORE
       });
       message = 'Joined event successfully';
       status = 201;

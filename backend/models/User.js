@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
+const PLAYER_STARTING_SCORE = 150;
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -24,7 +26,7 @@ const userSchema = new mongoose.Schema({
   },
   score: {
     type: Number,
-    default: 0
+    default: PLAYER_STARTING_SCORE
   },
   eventId: {
     type: mongoose.Schema.Types.ObjectId,
