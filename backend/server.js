@@ -24,20 +24,53 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// CORS Configuration - Restrict to frontend domain in production
+app.set('trust proxy', 1);
+
+const normalizeOrigin = (value = '') => value.trim().replace(/\/$/, '');
+const FRONTEND_URL = normalizeOrigin(process.env.FRONTEND_URL || process.env.CORS_ORIGIN || 'https://cyber-ctf-beta.vercel.app');
+const isProduction = NODE_ENV === 'production';
+
+const missingRequiredEnv = [];
+if (!process.env.JWT_SECRET) {
+  missingRequiredEnv.push('JWT_SECRET');
+}
+if (!process.env.MONGO_URI && !process.env.MONGODB_URI) {
+  missingRequiredEnv.push('MONGO_URI');
+}
+if (isProduction && !process.env.FRONTEND_URL && !process.env.CORS_ORIGIN) {
+  missingRequiredEnv.push('FRONTEND_URL');
+}
+
+if (missingRequiredEnv.length > 0) {
+  console.error(`[CONFIG] Missing required environment variables: ${missingRequiredEnv.join(', ')}`);
+  if (isProduction) {
+    process.exit(1);
+  }
+}
+
+if (!process.env.FRONTEND_URL && !process.env.CORS_ORIGIN) {
+  console.warn(`[CONFIG] FRONTEND_URL not set. Falling back to ${FRONTEND_URL}`);
+}
+
+// CORS Configuration - allow only the configured frontend origin
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    // Allow requests from server-to-server tools (no browser origin header)
+    if (!origin) return callback(null, true);
+    if (normalizeOrigin(origin) === FRONTEND_URL) return callback(null, true);
+    return callback(new Error('CORS policy violation: origin not allowed'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 };
 
 if (NODE_ENV === 'development') {
   console.log('[CORS] Configuration:', {
-    allowedOrigin: corsOptions.origin,
+    allowedOrigin: FRONTEND_URL,
     credentials: corsOptions.credentials,
-    fromEnv: !!process.env.CORS_ORIGIN,
+    fromEnv: !!(process.env.FRONTEND_URL || process.env.CORS_ORIGIN),
     nodeEnv: NODE_ENV
   });
 }
@@ -72,6 +105,21 @@ const apiRateLimit = rateLimit({
 
 app.use('/api', apiRateLimit);
 
+// Return a meaningful error when DB is unavailable instead of hanging/crashing.
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') {
+    return next();
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      message: 'Database temporarily unavailable. Please try again shortly.'
+    });
+  }
+
+  return next();
+});
+
 // Request timeout (15 seconds for general requests)
 app.use((req, res, next) => {
   req.setTimeout(15000);
@@ -99,7 +147,12 @@ app.use('/api/categories', categoryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const dbConnected = mongoose.connection.readyState === 1;
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'ok' : 'degraded',
+    db: dbConnected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // 404 handler
@@ -112,66 +165,107 @@ app.use(errorHandler);
 
 // Connect to MongoDB and start server
 let server;
+let dbRetryTimer = null;
+
+const connectToMongoWithRetry = async (attempt = 1) => {
+  const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+
+  if (!mongoUri) {
+    console.error(`[DB] Attempt ${attempt} failed: MONGO_URI is not configured`);
+  } else {
+    try {
+      await mongoose.connect(mongoUri, {
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        retryWrites: true,
+        w: 'majority'
+      });
+
+      console.log('[DB] Connected to MongoDB');
+      return;
+    } catch (error) {
+      console.error(`[DB] Connection attempt ${attempt} failed:`, error.message);
+    }
+  }
+
+  const delayMs = Math.min(30000, attempt * 5000);
+  console.log(`[DB] Retrying MongoDB connection in ${Math.floor(delayMs / 1000)}s`);
+  dbRetryTimer = setTimeout(() => {
+    dbRetryTimer = null;
+    connectToMongoWithRetry(attempt + 1).catch((error) => {
+      console.error('[DB] Unexpected retry error:', error.message);
+    });
+  }, delayMs);
+};
 
 const startServer = async () => {
   try {
-    // MongoDB connection with production options
-    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/ctf-platform';
-
-    await mongoose.connect(mongoUri, {
-      maxPoolSize: 10,
-      minPoolSize: 2,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      retryWrites: true,
-      w: 'majority'
-    });
-
-    if (NODE_ENV !== 'test') {
-      console.log('✓ Connected to MongoDB');
-    }
-
-    // Start server with error handling
+    // Start server first to avoid 502 from process exit during transient DB issues.
     server = app.listen(PORT, '0.0.0.0', () => {
-      if (NODE_ENV !== 'test') {
-        console.log(`✓ Server running on port ${PORT} [${NODE_ENV}]`);
-      }
+      console.log(`[STARTUP] Server running on port ${PORT} [${NODE_ENV}]`);
     });
 
     // Handle server errors
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
-        console.error(`✗ Port ${PORT} is already in use. Please kill the process or use a different port.`);
+        console.error(`[STARTUP] Port ${PORT} is already in use. Please kill the process or use a different port.`);
         process.exit(1);
       }
-      throw err;
+      console.error('[STARTUP] Server error:', err);
+      process.exit(1);
     });
 
+    mongoose.connection.on('connected', () => {
+      console.log('[DB] Connection state: connected');
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.warn('[DB] Connection state: disconnected');
+      if (!dbRetryTimer) {
+        connectToMongoWithRetry().catch((error) => {
+          console.error('[DB] Reconnect flow error:', error.message);
+        });
+      }
+    });
+
+    mongoose.connection.on('error', (error) => {
+      console.error('[DB] MongoDB error:', error.message);
+    });
+
+    await connectToMongoWithRetry();
+
   } catch (error) {
-    console.error('✗ Failed to start server:', error.message);
+    console.error('[STARTUP] Failed to start server:', error.message);
     process.exit(1);
   }
 };
 
 // Graceful shutdown handling
 const gracefulShutdown = async () => {
-  console.log('\n🛑 Shutting down gracefully...');
+  console.log('\n[SHUTDOWN] Shutting down gracefully...');
+
+  if (dbRetryTimer) {
+    clearTimeout(dbRetryTimer);
+    dbRetryTimer = null;
+  }
 
   if (server) {
     server.close(async () => {
-      console.log('✓ Server closed');
+      console.log('[SHUTDOWN] Server closed');
       try {
         await mongoose.disconnect();
-        console.log('✓ MongoDB disconnected');
+        console.log('[SHUTDOWN] MongoDB disconnected');
       } catch (error) {
-        console.error('✗ Error disconnecting MongoDB:', error.message);
+        console.error('[SHUTDOWN] Error disconnecting MongoDB:', error.message);
       }
       process.exit(0);
     });
 
     // Force shutdown after 10 seconds
     setTimeout(() => {
-      console.error('✗ Forced shutdown after timeout');
+      console.error('[SHUTDOWN] Forced shutdown after timeout');
       process.exit(1);
     }, 10000);
   } else {
@@ -185,13 +279,13 @@ process.on('SIGINT', gracefulShutdown);
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('✗ Uncaught Exception:', error);
+  console.error('[PROCESS] Uncaught Exception:', error);
   gracefulShutdown();
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('✗ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('[PROCESS] Unhandled Rejection at:', promise, 'reason:', reason);
   gracefulShutdown();
 });
 

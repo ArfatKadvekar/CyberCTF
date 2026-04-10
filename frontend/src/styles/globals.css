@@ -121,3 +121,4 @@ body {
 .badge-easy { background-color: oklch(var(--success) / 0.2); color: oklch(var(--success)); }
 .badge-medium { background-color: oklch(var(--warning) / 0.2); color: oklch(var(--warning)); }
 .badge-hard { background-color: oklch(var(--destructive) / 0.2); color: oklch(var(--destructive)); }
+
