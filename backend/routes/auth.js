@@ -92,12 +92,14 @@ router.post('/join', async (req, res, next) => {
 router.post('/admin/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
+    const normalizedUsername = typeof username === 'string' ? username.trim() : '';
+    const normalizedPassword = typeof password === 'string' ? password : '';
 
-    if (!username || !password) {
+    if (!normalizedUsername || !normalizedPassword) {
       return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    const admin = await User.findOne({ username: username.trim(), role: 'admin' }).select('_id username email password role isBanned status banReason banExpiresAt');
+    const admin = await User.findOne({ username: normalizedUsername, role: 'admin' }).select('_id username email password role isBanned status banReason banExpiresAt');
     const isAdminBanned = admin
       && (admin.isBanned || admin.status === 'banned')
       && (!admin.banExpiresAt || admin.banExpiresAt > new Date());
@@ -115,7 +117,7 @@ router.post('/admin/login', async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const isMatch = await admin.comparePassword(password);
+    const isMatch = await admin.comparePassword(normalizedPassword);
 
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });

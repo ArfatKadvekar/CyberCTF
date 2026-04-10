@@ -163,46 +163,36 @@ app.use((req, res) => {
 // Error handler
 app.use(errorHandler);
 
-// Connect to MongoDB and start server
+// Connect to MongoDB before accepting traffic (fail-fast startup)
 let server;
-let dbRetryTimer = null;
 
-const connectToMongoWithRetry = async (attempt = 1) => {
+const connectToMongo = async () => {
   const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
   if (!mongoUri) {
-    console.error(`[DB] Attempt ${attempt} failed: MONGO_URI is not configured`);
-  } else {
-    try {
-      await mongoose.connect(mongoUri, {
-        maxPoolSize: 10,
-        minPoolSize: 2,
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        retryWrites: true,
-        w: 'majority'
-      });
-
-      console.log('[DB] Connected to MongoDB');
-      return;
-    } catch (error) {
-      console.error(`[DB] Connection attempt ${attempt} failed:`, error.message);
-    }
+    throw new Error('MONGO_URI is not configured');
   }
 
-  const delayMs = Math.min(30000, attempt * 5000);
-  console.log(`[DB] Retrying MongoDB connection in ${Math.floor(delayMs / 1000)}s`);
-  dbRetryTimer = setTimeout(() => {
-    dbRetryTimer = null;
-    connectToMongoWithRetry(attempt + 1).catch((error) => {
-      console.error('[DB] Unexpected retry error:', error.message);
+  try {
+    await mongoose.connect(mongoUri, {
+      maxPoolSize: 10,
+      minPoolSize: 2,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      retryWrites: true,
+      w: 'majority'
     });
-  }, delayMs);
+    console.log('[DB] Connected to MongoDB');
+  } catch (error) {
+    console.error('[DB] Initial MongoDB connection failed:', error.message);
+    throw error;
+  }
 };
 
 const startServer = async () => {
   try {
-    // Start server first to avoid 502 from process exit during transient DB issues.
+    await connectToMongo();
+
     server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`[STARTUP] Server running on port ${PORT} [${NODE_ENV}]`);
     });
@@ -223,18 +213,15 @@ const startServer = async () => {
 
     mongoose.connection.on('disconnected', () => {
       console.warn('[DB] Connection state: disconnected');
-      if (!dbRetryTimer) {
-        connectToMongoWithRetry().catch((error) => {
-          console.error('[DB] Reconnect flow error:', error.message);
-        });
+      if (NODE_ENV === 'production') {
+        console.error('[DB] Lost MongoDB connection in production. Exiting for clean restart.');
+        process.exit(1);
       }
     });
 
     mongoose.connection.on('error', (error) => {
       console.error('[DB] MongoDB error:', error.message);
     });
-
-    await connectToMongoWithRetry();
 
   } catch (error) {
     console.error('[STARTUP] Failed to start server:', error.message);
@@ -245,11 +232,6 @@ const startServer = async () => {
 // Graceful shutdown handling
 const gracefulShutdown = async () => {
   console.log('\n[SHUTDOWN] Shutting down gracefully...');
-
-  if (dbRetryTimer) {
-    clearTimeout(dbRetryTimer);
-    dbRetryTimer = null;
-  }
 
   if (server) {
     server.close(async () => {
@@ -280,13 +262,13 @@ process.on('SIGINT', gracefulShutdown);
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('[PROCESS] Uncaught Exception:', error);
-  gracefulShutdown();
+  process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[PROCESS] Unhandled Rejection at:', promise, 'reason:', reason);
-  gracefulShutdown();
+  process.exit(1);
 });
 
 startServer();
