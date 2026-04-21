@@ -35,22 +35,17 @@ This document outlines the security measures implemented and recommendations for
 
 ### ⚠️ Current Vulnerabilities (To Address)
 
-1. **Exposed Credentials in Git History** (LOW RISK)
-   - Any commits before security hardening may contain .env
-   - Recommend: Create GitHub Secrets after cleaning history
-   - or: Accept as dev-only repo risk
-
-2. **CORS Currently Permissive**
+1. **CORS Currently Permissive**
    - Set to accept all origins: `cors()`
    - Recommendation: Restrict to frontend domain in production
    - Update location: `backend/server.js` line ~20
 
-3. **MongoDB IP Whitelist**
+2. **MongoDB IP Whitelist**
    - Must be configured in MongoDB Atlas
    - Current: May allow all IPs (0.0.0.0/0)
    - Recommendation: Restrict to Vercel IPs or specific IPs
 
-4. **JWT Secret Rotation**
+3. **JWT Secret Rotation**
    - Current secret: "ctf-platform-super-secret-jwt-key" (in code as fallback)
    - Recommendation: Generate new 32-char secret with: 
      ```bash
