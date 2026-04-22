@@ -141,5 +141,5 @@ The current implementation is optimized for small to medium academic events and 
 | 1 | Arfat Kadvekar | Developer | [arfatkadvekar1305@gmail.com](mailto:arfatkadvekar1305@gmail.com) |
 | 2 | Obaidullah Shaikh | Developer | [shkobaid88@gmail.com](mailto:shkobaid88@gmail.com) |
 | 3 | Omair Potrick | Developer | [omairpotrick@gmail.com](mailto:omairpotrick@gmail.com) |
-| 4 | Aditi Raje | Developer | <member4-email> |
+| 4 | Aditi Raje | Developer | [aditiraje006@gmail.com](mailto:aditiraje006@gmail.com) |
 | 5 | Soham Metha | Developer | [sohammetha01@gmail.com](mailto:sohammetha01@gmail.com) |
